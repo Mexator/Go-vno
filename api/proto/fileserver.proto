@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package fsapi;
+
+service FileServer {
+	rpc Exists(ExistsRequest) returns (ExistsResponse) {}
+	rpc Read(ReadRequest) returns (ReadResponse) {}
+	rpc Write(WriteRequest) returns (WriteResponse) {}
+	rpc Create(CreateRequest) returns (CreateResponse) {}
+	rpc Remove(RemoveRequest) returns (RemoveResponse) {}
+}
+
+message ExistsRequest {
+	string fname = 1;
+}
+
+message ExistsResponse {
+	bool exists = 1;
+}
+
+message ReadRequest {
+	string fname = 1;
+	uint64 offset = 2;
+	uint64 size = 3;
+}
+
+message ReadResponse {
+	bytes content = 1;
+}
+
+message WriteRequest {
+	string fname = 1;
+	uint64 offset = 2;
+	bytes content = 3;
+}
+
+message WriteResponse {
+	bool ok = 1;
+}
+
+message CreateRequest {
+	string fname = 1;
+}
+
+message CreateResponse {
+	bool ok = 1;
+}
+
+message RemoveRequest {
+	string fname = 1;
+}
+
+message RemoveResponse {
+	bool ok = 1;
+}
