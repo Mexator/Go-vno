@@ -4,12 +4,10 @@
 // 	protoc        v3.12.4
 // source: nameserver.proto
 
-package nsapi
+package nameserver
 
 import (
-	context "context"
 	proto "github.com/golang/protobuf/proto"
-	grpc "google.golang.org/grpc"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -31,7 +29,10 @@ var File_nameserver_proto protoreflect.FileDescriptor
 var file_nameserver_proto_rawDesc = []byte{
 	0x0a, 0x10, 0x6e, 0x61, 0x6d, 0x65, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2e, 0x70, 0x72, 0x6f,
 	0x74, 0x6f, 0x12, 0x05, 0x6e, 0x73, 0x61, 0x70, 0x69, 0x32, 0x0c, 0x0a, 0x0a, 0x4e, 0x61, 0x6d,
-	0x65, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x65, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x42, 0x2e, 0x5a, 0x2c, 0x67, 0x69, 0x74, 0x68, 0x75,
+	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x4d, 0x65, 0x78, 0x61, 0x74, 0x6f, 0x72, 0x2f, 0x47, 0x6f,
+	0x2d, 0x76, 0x6e, 0x6f, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x6e, 0x61, 0x6d,
+	0x65, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var file_nameserver_proto_goTypes = []interface{}{}
@@ -65,46 +66,4 @@ func file_nameserver_proto_init() {
 	file_nameserver_proto_rawDesc = nil
 	file_nameserver_proto_goTypes = nil
 	file_nameserver_proto_depIdxs = nil
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
-
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion6
-
-// NameServerClient is the client API for NameServer service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type NameServerClient interface {
-}
-
-type nameServerClient struct {
-	cc grpc.ClientConnInterface
-}
-
-func NewNameServerClient(cc grpc.ClientConnInterface) NameServerClient {
-	return &nameServerClient{cc}
-}
-
-// NameServerServer is the server API for NameServer service.
-type NameServerServer interface {
-}
-
-// UnimplementedNameServerServer can be embedded to have forward compatible implementations.
-type UnimplementedNameServerServer struct {
-}
-
-func RegisterNameServerServer(s *grpc.Server, srv NameServerServer) {
-	s.RegisterService(&_NameServer_serviceDesc, srv)
-}
-
-var _NameServer_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "nsapi.NameServer",
-	HandlerType: (*NameServerServer)(nil),
-	Methods:     []grpc.MethodDesc{},
-	Streams:     []grpc.StreamDesc{},
-	Metadata:    "nameserver.proto",
 }
