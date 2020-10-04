@@ -9,12 +9,13 @@ service NameServer {
 	rpc Create(CreateRequest) returns (CreateResponse) {}
 	rpc Remove(RemoveRequest) returns (RemoveResponse) {}
 
-	rpc MapFS(MapFSRequest) returns (LookupResponse) {}
+	rpc MapFS(MapFSRequest) returns (MapFSResponse) {}
 }
 
 message Node {
 	bool is_dir = 1;
 	string name = 2;
+	uint64 size = 3;
 }
 
 message LookupRequest {
@@ -22,7 +23,7 @@ message LookupRequest {
 }
 
 message LookupResponse {
-	repeated Nodes nodes = 1;
+	repeated Node nodes = 1;
 }
 
 message CreateRequest {
@@ -42,5 +43,6 @@ message MapFSRequest {
 }
 
 message MapFSResponse {
-	string fsurl = 2;
+	string fsurl = 1;
+	string inode = 2;
 }

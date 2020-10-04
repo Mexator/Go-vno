@@ -7,7 +7,11 @@
 package fileserver
 
 import (
+	context "context"
 	proto "github.com/golang/protobuf/proto"
+	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -25,6 +29,100 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
+type SizeRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Inode string `protobuf:"bytes,1,opt,name=inode,proto3" json:"inode,omitempty"`
+}
+
+func (x *SizeRequest) Reset() {
+	*x = SizeRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_fileserver_proto_msgTypes[0]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SizeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SizeRequest) ProtoMessage() {}
+
+func (x *SizeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_fileserver_proto_msgTypes[0]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SizeRequest.ProtoReflect.Descriptor instead.
+func (*SizeRequest) Descriptor() ([]byte, []int) {
+	return file_fileserver_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *SizeRequest) GetInode() string {
+	if x != nil {
+		return x.Inode
+	}
+	return ""
+}
+
+type SizeResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Size uint64 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
+}
+
+func (x *SizeResponse) Reset() {
+	*x = SizeResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_fileserver_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SizeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SizeResponse) ProtoMessage() {}
+
+func (x *SizeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_fileserver_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SizeResponse.ProtoReflect.Descriptor instead.
+func (*SizeResponse) Descriptor() ([]byte, []int) {
+	return file_fileserver_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *SizeResponse) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
 type ReadRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -38,7 +136,7 @@ type ReadRequest struct {
 func (x *ReadRequest) Reset() {
 	*x = ReadRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_fileserver_proto_msgTypes[0]
+		mi := &file_fileserver_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -51,7 +149,7 @@ func (x *ReadRequest) String() string {
 func (*ReadRequest) ProtoMessage() {}
 
 func (x *ReadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fileserver_proto_msgTypes[0]
+	mi := &file_fileserver_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -64,7 +162,7 @@ func (x *ReadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadRequest.ProtoReflect.Descriptor instead.
 func (*ReadRequest) Descriptor() ([]byte, []int) {
-	return file_fileserver_proto_rawDescGZIP(), []int{0}
+	return file_fileserver_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ReadRequest) GetInode() string {
@@ -99,7 +197,7 @@ type ReadResponse struct {
 func (x *ReadResponse) Reset() {
 	*x = ReadResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_fileserver_proto_msgTypes[1]
+		mi := &file_fileserver_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -112,7 +210,7 @@ func (x *ReadResponse) String() string {
 func (*ReadResponse) ProtoMessage() {}
 
 func (x *ReadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_fileserver_proto_msgTypes[1]
+	mi := &file_fileserver_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -125,7 +223,7 @@ func (x *ReadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadResponse.ProtoReflect.Descriptor instead.
 func (*ReadResponse) Descriptor() ([]byte, []int) {
-	return file_fileserver_proto_rawDescGZIP(), []int{1}
+	return file_fileserver_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ReadResponse) GetContent() []byte {
@@ -148,7 +246,7 @@ type WriteRequest struct {
 func (x *WriteRequest) Reset() {
 	*x = WriteRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_fileserver_proto_msgTypes[2]
+		mi := &file_fileserver_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -161,7 +259,7 @@ func (x *WriteRequest) String() string {
 func (*WriteRequest) ProtoMessage() {}
 
 func (x *WriteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fileserver_proto_msgTypes[2]
+	mi := &file_fileserver_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -174,7 +272,7 @@ func (x *WriteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteRequest.ProtoReflect.Descriptor instead.
 func (*WriteRequest) Descriptor() ([]byte, []int) {
-	return file_fileserver_proto_rawDescGZIP(), []int{2}
+	return file_fileserver_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *WriteRequest) GetInode() string {
@@ -207,7 +305,7 @@ type WriteResponse struct {
 func (x *WriteResponse) Reset() {
 	*x = WriteResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_fileserver_proto_msgTypes[3]
+		mi := &file_fileserver_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -220,7 +318,7 @@ func (x *WriteResponse) String() string {
 func (*WriteResponse) ProtoMessage() {}
 
 func (x *WriteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_fileserver_proto_msgTypes[3]
+	mi := &file_fileserver_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -233,7 +331,7 @@ func (x *WriteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteResponse.ProtoReflect.Descriptor instead.
 func (*WriteResponse) Descriptor() ([]byte, []int) {
-	return file_fileserver_proto_rawDescGZIP(), []int{3}
+	return file_fileserver_proto_rawDescGZIP(), []int{5}
 }
 
 type CreateRequest struct {
@@ -247,7 +345,7 @@ type CreateRequest struct {
 func (x *CreateRequest) Reset() {
 	*x = CreateRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_fileserver_proto_msgTypes[4]
+		mi := &file_fileserver_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -260,7 +358,7 @@ func (x *CreateRequest) String() string {
 func (*CreateRequest) ProtoMessage() {}
 
 func (x *CreateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fileserver_proto_msgTypes[4]
+	mi := &file_fileserver_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -273,7 +371,7 @@ func (x *CreateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRequest.ProtoReflect.Descriptor instead.
 func (*CreateRequest) Descriptor() ([]byte, []int) {
-	return file_fileserver_proto_rawDescGZIP(), []int{4}
+	return file_fileserver_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CreateRequest) GetInode() string {
@@ -292,7 +390,7 @@ type CreateResponse struct {
 func (x *CreateResponse) Reset() {
 	*x = CreateResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_fileserver_proto_msgTypes[5]
+		mi := &file_fileserver_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -305,7 +403,7 @@ func (x *CreateResponse) String() string {
 func (*CreateResponse) ProtoMessage() {}
 
 func (x *CreateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_fileserver_proto_msgTypes[5]
+	mi := &file_fileserver_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -318,7 +416,7 @@ func (x *CreateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateResponse.ProtoReflect.Descriptor instead.
 func (*CreateResponse) Descriptor() ([]byte, []int) {
-	return file_fileserver_proto_rawDescGZIP(), []int{5}
+	return file_fileserver_proto_rawDescGZIP(), []int{7}
 }
 
 type RemoveRequest struct {
@@ -332,7 +430,7 @@ type RemoveRequest struct {
 func (x *RemoveRequest) Reset() {
 	*x = RemoveRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_fileserver_proto_msgTypes[6]
+		mi := &file_fileserver_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -345,7 +443,7 @@ func (x *RemoveRequest) String() string {
 func (*RemoveRequest) ProtoMessage() {}
 
 func (x *RemoveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fileserver_proto_msgTypes[6]
+	mi := &file_fileserver_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -358,7 +456,7 @@ func (x *RemoveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRequest.ProtoReflect.Descriptor instead.
 func (*RemoveRequest) Descriptor() ([]byte, []int) {
-	return file_fileserver_proto_rawDescGZIP(), []int{6}
+	return file_fileserver_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RemoveRequest) GetInode() string {
@@ -377,7 +475,7 @@ type RemoveResponse struct {
 func (x *RemoveResponse) Reset() {
 	*x = RemoveResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_fileserver_proto_msgTypes[7]
+		mi := &file_fileserver_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -390,7 +488,7 @@ func (x *RemoveResponse) String() string {
 func (*RemoveResponse) ProtoMessage() {}
 
 func (x *RemoveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_fileserver_proto_msgTypes[7]
+	mi := &file_fileserver_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -403,54 +501,61 @@ func (x *RemoveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveResponse.ProtoReflect.Descriptor instead.
 func (*RemoveResponse) Descriptor() ([]byte, []int) {
-	return file_fileserver_proto_rawDescGZIP(), []int{7}
+	return file_fileserver_proto_rawDescGZIP(), []int{9}
 }
 
 var File_fileserver_proto protoreflect.FileDescriptor
 
 var file_fileserver_proto_rawDesc = []byte{
 	0x0a, 0x10, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x12, 0x05, 0x66, 0x73, 0x61, 0x70, 0x69, 0x22, 0x4f, 0x0a, 0x0b, 0x52, 0x65, 0x61,
-	0x64, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x69, 0x6e, 0x6f, 0x64,
-	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x12, 0x16,
-	0x0a, 0x06, 0x6f, 0x66, 0x66, 0x73, 0x65, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x06,
-	0x6f, 0x66, 0x66, 0x73, 0x65, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x03,
-	0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x22, 0x28, 0x0a, 0x0c, 0x52, 0x65,
-	0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f,
-	0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e,
-	0x74, 0x65, 0x6e, 0x74, 0x22, 0x56, 0x0a, 0x0c, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x6f, 0x66,
-	0x66, 0x73, 0x65, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x06, 0x6f, 0x66, 0x66, 0x73,
-	0x65, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x03, 0x20,
-	0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x0f, 0x0a, 0x0d,
-	0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x25, 0x0a,
-	0x0d, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x14,
-	0x0a, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x69,
-	0x6e, 0x6f, 0x64, 0x65, 0x22, 0x10, 0x0a, 0x0e, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65,
-	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x25, 0x0a, 0x0d, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65,
+	0x74, 0x6f, 0x12, 0x05, 0x66, 0x73, 0x61, 0x70, 0x69, 0x22, 0x23, 0x0a, 0x0b, 0x53, 0x69, 0x7a,
+	0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x69, 0x6e, 0x6f, 0x64,
+	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x22, 0x22,
+	0x0a, 0x0c, 0x53, 0x69, 0x7a, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12,
+	0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x73, 0x69,
+	0x7a, 0x65, 0x22, 0x4f, 0x0a, 0x0b, 0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x12, 0x14, 0x0a, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x6f, 0x66, 0x66, 0x73, 0x65,
+	0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x06, 0x6f, 0x66, 0x66, 0x73, 0x65, 0x74, 0x12,
+	0x12, 0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x73,
+	0x69, 0x7a, 0x65, 0x22, 0x28, 0x0a, 0x0c, 0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f,
+	0x6e, 0x73, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x56, 0x0a,
+	0x0c, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x14, 0x0a,
+	0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x69, 0x6e,
+	0x6f, 0x64, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x6f, 0x66, 0x66, 0x73, 0x65, 0x74, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x04, 0x52, 0x06, 0x6f, 0x66, 0x66, 0x73, 0x65, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x63,
+	0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f,
+	0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x0f, 0x0a, 0x0d, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x25, 0x0a, 0x0d, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65,
 	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65,
 	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x22, 0x10, 0x0a,
-	0x0e, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x32,
-	0xe7, 0x01, 0x0a, 0x0a, 0x46, 0x69, 0x6c, 0x65, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x12, 0x31,
-	0x0a, 0x04, 0x52, 0x65, 0x61, 0x64, 0x12, 0x12, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x52,
-	0x65, 0x61, 0x64, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x13, 0x2e, 0x66, 0x73, 0x61,
-	0x70, 0x69, 0x2e, 0x52, 0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22,
-	0x00, 0x12, 0x34, 0x0a, 0x05, 0x57, 0x72, 0x69, 0x74, 0x65, 0x12, 0x13, 0x2e, 0x66, 0x73, 0x61,
-	0x70, 0x69, 0x2e, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
-	0x14, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x73,
-	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x37, 0x0a, 0x06, 0x43, 0x72, 0x65, 0x61, 0x74,
-	0x65, 0x12, 0x14, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x15, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e,
-	0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00,
-	0x12, 0x37, 0x0a, 0x06, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x12, 0x14, 0x2e, 0x66, 0x73, 0x61,
-	0x70, 0x69, 0x2e, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
-	0x1a, 0x15, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52,
-	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x42, 0x2e, 0x5a, 0x2c, 0x67, 0x69, 0x74,
-	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x4d, 0x65, 0x78, 0x61, 0x74, 0x6f, 0x72, 0x2f,
-	0x47, 0x6f, 0x2d, 0x76, 0x6e, 0x6f, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x66,
-	0x69, 0x6c, 0x65, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x33,
+	0x0e, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22,
+	0x25, 0x0a, 0x0d, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x12, 0x14, 0x0a, 0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x05, 0x69, 0x6e, 0x6f, 0x64, 0x65, 0x22, 0x10, 0x0a, 0x0e, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x32, 0x9a, 0x02, 0x0a, 0x0a, 0x46, 0x69, 0x6c,
+	0x65, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x12, 0x31, 0x0a, 0x04, 0x53, 0x69, 0x7a, 0x65, 0x12,
+	0x12, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x69, 0x7a, 0x65, 0x52, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x1a, 0x13, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x69, 0x7a, 0x65,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x31, 0x0a, 0x04, 0x52, 0x65,
+	0x61, 0x64, 0x12, 0x12, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x52, 0x65, 0x61, 0x64, 0x52,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x13, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x52,
+	0x65, 0x61, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x34, 0x0a,
+	0x05, 0x57, 0x72, 0x69, 0x74, 0x65, 0x12, 0x13, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x57,
+	0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x14, 0x2e, 0x66, 0x73,
+	0x61, 0x70, 0x69, 0x2e, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x22, 0x00, 0x12, 0x37, 0x0a, 0x06, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x12, 0x14, 0x2e,
+	0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x1a, 0x15, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x43, 0x72, 0x65, 0x61,
+	0x74, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x37, 0x0a, 0x06,
+	0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x12, 0x14, 0x2e, 0x66, 0x73, 0x61, 0x70, 0x69, 0x2e, 0x52,
+	0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x15, 0x2e, 0x66,
+	0x73, 0x61, 0x70, 0x69, 0x2e, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f,
+	0x6e, 0x73, 0x65, 0x22, 0x00, 0x42, 0x2e, 0x5a, 0x2c, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
+	0x63, 0x6f, 0x6d, 0x2f, 0x4d, 0x65, 0x78, 0x61, 0x74, 0x6f, 0x72, 0x2f, 0x47, 0x6f, 0x2d, 0x76,
+	0x6e, 0x6f, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x66, 0x69, 0x6c, 0x65, 0x73,
+	0x65, 0x72, 0x76, 0x65, 0x72, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -465,28 +570,32 @@ func file_fileserver_proto_rawDescGZIP() []byte {
 	return file_fileserver_proto_rawDescData
 }
 
-var file_fileserver_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_fileserver_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_fileserver_proto_goTypes = []interface{}{
-	(*ReadRequest)(nil),    // 0: fsapi.ReadRequest
-	(*ReadResponse)(nil),   // 1: fsapi.ReadResponse
-	(*WriteRequest)(nil),   // 2: fsapi.WriteRequest
-	(*WriteResponse)(nil),  // 3: fsapi.WriteResponse
-	(*CreateRequest)(nil),  // 4: fsapi.CreateRequest
-	(*CreateResponse)(nil), // 5: fsapi.CreateResponse
-	(*RemoveRequest)(nil),  // 6: fsapi.RemoveRequest
-	(*RemoveResponse)(nil), // 7: fsapi.RemoveResponse
+	(*SizeRequest)(nil),    // 0: fsapi.SizeRequest
+	(*SizeResponse)(nil),   // 1: fsapi.SizeResponse
+	(*ReadRequest)(nil),    // 2: fsapi.ReadRequest
+	(*ReadResponse)(nil),   // 3: fsapi.ReadResponse
+	(*WriteRequest)(nil),   // 4: fsapi.WriteRequest
+	(*WriteResponse)(nil),  // 5: fsapi.WriteResponse
+	(*CreateRequest)(nil),  // 6: fsapi.CreateRequest
+	(*CreateResponse)(nil), // 7: fsapi.CreateResponse
+	(*RemoveRequest)(nil),  // 8: fsapi.RemoveRequest
+	(*RemoveResponse)(nil), // 9: fsapi.RemoveResponse
 }
 var file_fileserver_proto_depIdxs = []int32{
-	0, // 0: fsapi.FileServer.Read:input_type -> fsapi.ReadRequest
-	2, // 1: fsapi.FileServer.Write:input_type -> fsapi.WriteRequest
-	4, // 2: fsapi.FileServer.Create:input_type -> fsapi.CreateRequest
-	6, // 3: fsapi.FileServer.Remove:input_type -> fsapi.RemoveRequest
-	1, // 4: fsapi.FileServer.Read:output_type -> fsapi.ReadResponse
-	3, // 5: fsapi.FileServer.Write:output_type -> fsapi.WriteResponse
-	5, // 6: fsapi.FileServer.Create:output_type -> fsapi.CreateResponse
-	7, // 7: fsapi.FileServer.Remove:output_type -> fsapi.RemoveResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
+	0, // 0: fsapi.FileServer.Size:input_type -> fsapi.SizeRequest
+	2, // 1: fsapi.FileServer.Read:input_type -> fsapi.ReadRequest
+	4, // 2: fsapi.FileServer.Write:input_type -> fsapi.WriteRequest
+	6, // 3: fsapi.FileServer.Create:input_type -> fsapi.CreateRequest
+	8, // 4: fsapi.FileServer.Remove:input_type -> fsapi.RemoveRequest
+	1, // 5: fsapi.FileServer.Size:output_type -> fsapi.SizeResponse
+	3, // 6: fsapi.FileServer.Read:output_type -> fsapi.ReadResponse
+	5, // 7: fsapi.FileServer.Write:output_type -> fsapi.WriteResponse
+	7, // 8: fsapi.FileServer.Create:output_type -> fsapi.CreateResponse
+	9, // 9: fsapi.FileServer.Remove:output_type -> fsapi.RemoveResponse
+	5, // [5:10] is the sub-list for method output_type
+	0, // [0:5] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -499,7 +608,7 @@ func file_fileserver_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_fileserver_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReadRequest); i {
+			switch v := v.(*SizeRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -511,7 +620,7 @@ func file_fileserver_proto_init() {
 			}
 		}
 		file_fileserver_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReadResponse); i {
+			switch v := v.(*SizeResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -523,7 +632,7 @@ func file_fileserver_proto_init() {
 			}
 		}
 		file_fileserver_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*WriteRequest); i {
+			switch v := v.(*ReadRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -535,7 +644,7 @@ func file_fileserver_proto_init() {
 			}
 		}
 		file_fileserver_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*WriteResponse); i {
+			switch v := v.(*ReadResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -547,7 +656,7 @@ func file_fileserver_proto_init() {
 			}
 		}
 		file_fileserver_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CreateRequest); i {
+			switch v := v.(*WriteRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -559,7 +668,7 @@ func file_fileserver_proto_init() {
 			}
 		}
 		file_fileserver_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CreateResponse); i {
+			switch v := v.(*WriteResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -571,7 +680,7 @@ func file_fileserver_proto_init() {
 			}
 		}
 		file_fileserver_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RemoveRequest); i {
+			switch v := v.(*CreateRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -583,6 +692,30 @@ func file_fileserver_proto_init() {
 			}
 		}
 		file_fileserver_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CreateResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_fileserver_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RemoveRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_fileserver_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*RemoveResponse); i {
 			case 0:
 				return &v.state
@@ -601,7 +734,7 @@ func file_fileserver_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_fileserver_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
@@ -613,4 +746,230 @@ func file_fileserver_proto_init() {
 	file_fileserver_proto_rawDesc = nil
 	file_fileserver_proto_goTypes = nil
 	file_fileserver_proto_depIdxs = nil
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ context.Context
+var _ grpc.ClientConnInterface
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+const _ = grpc.SupportPackageIsVersion6
+
+// FileServerClient is the client API for FileServer service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+type FileServerClient interface {
+	Size(ctx context.Context, in *SizeRequest, opts ...grpc.CallOption) (*SizeResponse, error)
+	Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*ReadResponse, error)
+	Write(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error)
+	// Only for name server
+	Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error)
+	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error)
+}
+
+type fileServerClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewFileServerClient(cc grpc.ClientConnInterface) FileServerClient {
+	return &fileServerClient{cc}
+}
+
+func (c *fileServerClient) Size(ctx context.Context, in *SizeRequest, opts ...grpc.CallOption) (*SizeResponse, error) {
+	out := new(SizeResponse)
+	err := c.cc.Invoke(ctx, "/fsapi.FileServer/Size", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *fileServerClient) Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*ReadResponse, error) {
+	out := new(ReadResponse)
+	err := c.cc.Invoke(ctx, "/fsapi.FileServer/Read", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *fileServerClient) Write(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error) {
+	out := new(WriteResponse)
+	err := c.cc.Invoke(ctx, "/fsapi.FileServer/Write", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *fileServerClient) Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error) {
+	out := new(CreateResponse)
+	err := c.cc.Invoke(ctx, "/fsapi.FileServer/Create", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *fileServerClient) Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error) {
+	out := new(RemoveResponse)
+	err := c.cc.Invoke(ctx, "/fsapi.FileServer/Remove", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// FileServerServer is the server API for FileServer service.
+type FileServerServer interface {
+	Size(context.Context, *SizeRequest) (*SizeResponse, error)
+	Read(context.Context, *ReadRequest) (*ReadResponse, error)
+	Write(context.Context, *WriteRequest) (*WriteResponse, error)
+	// Only for name server
+	Create(context.Context, *CreateRequest) (*CreateResponse, error)
+	Remove(context.Context, *RemoveRequest) (*RemoveResponse, error)
+}
+
+// UnimplementedFileServerServer can be embedded to have forward compatible implementations.
+type UnimplementedFileServerServer struct {
+}
+
+func (*UnimplementedFileServerServer) Size(context.Context, *SizeRequest) (*SizeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Size not implemented")
+}
+func (*UnimplementedFileServerServer) Read(context.Context, *ReadRequest) (*ReadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Read not implemented")
+}
+func (*UnimplementedFileServerServer) Write(context.Context, *WriteRequest) (*WriteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
+}
+func (*UnimplementedFileServerServer) Create(context.Context, *CreateRequest) (*CreateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (*UnimplementedFileServerServer) Remove(context.Context, *RemoveRequest) (*RemoveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+}
+
+func RegisterFileServerServer(s *grpc.Server, srv FileServerServer) {
+	s.RegisterService(&_FileServer_serviceDesc, srv)
+}
+
+func _FileServer_Size_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SizeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileServerServer).Size(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/fsapi.FileServer/Size",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServerServer).Size(ctx, req.(*SizeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FileServer_Read_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileServerServer).Read(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/fsapi.FileServer/Read",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServerServer).Read(ctx, req.(*ReadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FileServer_Write_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileServerServer).Write(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/fsapi.FileServer/Write",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServerServer).Write(ctx, req.(*WriteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FileServer_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileServerServer).Create(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/fsapi.FileServer/Create",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServerServer).Create(ctx, req.(*CreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FileServer_Remove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileServerServer).Remove(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/fsapi.FileServer/Remove",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServerServer).Remove(ctx, req.(*RemoveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+var _FileServer_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "fsapi.FileServer",
+	HandlerType: (*FileServerServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Size",
+			Handler:    _FileServer_Size_Handler,
+		},
+		{
+			MethodName: "Read",
+			Handler:    _FileServer_Read_Handler,
+		},
+		{
+			MethodName: "Write",
+			Handler:    _FileServer_Write_Handler,
+		},
+		{
+			MethodName: "Create",
+			Handler:    _FileServer_Create_Handler,
+		},
+		{
+			MethodName: "Remove",
+			Handler:    _FileServer_Remove_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "fileserver.proto",
 }

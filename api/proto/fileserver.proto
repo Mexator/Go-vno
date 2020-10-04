@@ -5,12 +5,21 @@ package fsapi;
 option go_package = "github.com/Mexator/Go-vno/pkg/api/fileserver";
 
 service FileServer {
+	rpc Size(SizeRequest) returns (SizeResponse) {}
 	rpc Read(ReadRequest) returns (ReadResponse) {}
 	rpc Write(WriteRequest) returns (WriteResponse) {}
 
 	// Only for name server
 	rpc Create(CreateRequest) returns (CreateResponse) {}
 	rpc Remove(RemoveRequest) returns (RemoveResponse) {}
+}
+
+message SizeRequest {
+	string inode = 1;
+}
+
+message SizeResponse {
+	uint64 size = 1;
 }
 
 message ReadRequest {

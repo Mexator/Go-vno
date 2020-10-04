@@ -34,7 +34,7 @@ func main() {
 	}
 	defer c.Close()
 
-	err = fs.Serve(c, dfs.FS{})
+	err = fs.Serve(c, dfs.FS{Nsurl: nsurl})
 	if err != nil {
 		log.Fatal(err)
 	}
