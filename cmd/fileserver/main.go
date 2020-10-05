@@ -5,11 +5,16 @@ import (
 	"log"
 	"net"
 
+	"github.com/Mexator/Go-vno/pkg/config"
 	"github.com/Mexator/Go-vno/pkg/fileserver"
 
 	api "github.com/Mexator/Go-vno/pkg/api/fileserver"
 	"google.golang.org/grpc"
 )
+
+type fileServerConfig struct {
+	FilesDir string `json:"files_dir"`
+}
 
 func main() {
 	config := flag.String("config", "./config.json", "Path to JSON config file")
@@ -22,7 +27,12 @@ func main() {
 
 func startFileServer(configPath string) error {
 	s := grpc.NewServer()
-	srv, err := fileserver.MakeFileServer(configPath)
+
+	conf := new(fileServerConfig)
+
+	err := config.ReadConfig(&conf, configPath)
+
+	srv, err := fileserver.MakeFileServer(conf.FilesDir)
 	if err != nil {
 		return err
 	}
