@@ -74,7 +74,6 @@ func (server FileServer) Size(ctx context.Context,
 	fileInfo, err := os.Stat(filePath)
 
 	if err == nil {
-		log.Print(api.SizeResponse{Size: uint64(fileInfo.Size())})
 		return &api.SizeResponse{Size: uint64(fileInfo.Size())}, nil
 	}
 
@@ -86,15 +85,19 @@ func (server FileServer) Read(ctx context.Context,
 	request *api.ReadRequest) (*api.ReadResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
+	log.Println("Reading" + filePath)
+
 	file, err := os.Open(filePath)
 
 	if err == nil {
 		defer file.Close()
-		buffer := make([]byte, 0, request.Size)
+		log.Println("Opened")
+		buffer := make([]byte, request.Size)
 		var len int
 		len, err = file.ReadAt(buffer, int64(request.Offset))
-		if len > 0 && err == io.EOF {
-			return &api.ReadResponse{Content: buffer}, nil
+		if len > 0 && (err == nil || err == io.EOF) {
+			log.Println("Read:" + string(buffer))
+			return &api.ReadResponse{Content: buffer[:len]}, nil
 		}
 	}
 	return &api.ReadResponse{Content: nil}, err
@@ -104,11 +107,11 @@ func (server FileServer) Write(ctx context.Context,
 	request *api.WriteRequest) (*api.WriteResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
-	file, err := os.Open(filePath)
+	file, err := os.OpenFile(filePath, os.O_RDWR, 0777)
 
 	if err == nil {
 		defer file.Close()
-		_, err = file.WriteAt(request.Content, int64(request.Offset))
+		file.WriteAt(request.Content, int64(request.Offset))
 		return &api.WriteResponse{}, nil
 	}
 	return nil, err
