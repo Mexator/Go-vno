@@ -2,11 +2,12 @@ package fileserver
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log"
 	"os"
 	"path"
+
+	"github.com/pkg/errors"
 
 	syscall "golang.org/x/sys/unix"
 
@@ -29,7 +30,7 @@ type fileServerConfig struct {
 func initializeServerCatalog(path string) error {
 	dir, err := os.Open(path)
 	if err != nil && !os.IsNotExist(err) {
-		return errors.New("Can not open server catalog:" + err.Error())
+		return errors.Wrap(err, "Can not open server catalog:")
 	}
 
 	info, _ := dir.Stat()
@@ -45,7 +46,7 @@ func initializeServerCatalog(path string) error {
 		log.Println("Server catalog not found. Creating one in " + path)
 		err := os.Mkdir(path, 0777)
 		os.Chmod(path, 0777)
-		return errors.New("Can not create server catalog:" + err.Error())
+		return errors.Wrap(err, "Can not create server catalog")
 	}
 	return err
 }
@@ -59,14 +60,13 @@ func MakeFileServer(configFilename string) (FileServer, error) {
 
 	err := config.ReadConfig(&conf, configFilename)
 	if err != nil {
-		return FileServer{}, errors.New(
-			"Can not open config file:" + err.Error())
+		return FileServer{}, errors.Wrap(err, "Can not open config file")
 	}
 
 	err = initializeServerCatalog(conf.FilesDir)
 	if err != nil {
-		return FileServer{}, errors.New(
-			"Server catalog can not be initialized: " + err.Error())
+		return FileServer{}, errors.Wrap(err,
+			"Server catalog can not be initialized")
 	}
 
 	file, _ := os.Open(conf.FilesDir)
@@ -138,7 +138,7 @@ func (server FileServer) Create(ctx context.Context,
 		defer file.Close()
 
 		if err != nil {
-			return nil, errors.New("Can not create fragment: " + err.Error())
+			return nil, errors.Wrap(err, "Can not create fragment")
 		}
 		return &api.CreateResponse{}, nil
 	}
@@ -152,7 +152,7 @@ func (server FileServer) Remove(ctx context.Context,
 	filePath := path.Join(server.storagePath, request.Inode)
 	err := os.Remove(filePath)
 	if err == nil {
-		return nil, errors.New("Can not remove fragment: " + err.Error())
+		return nil, errors.Wrap(err, "Can not remove fragment")
 	}
 	return &api.RemoveResponse{}, nil
 }
