@@ -25,24 +25,27 @@ type fileServerConfig struct {
 	FilesDir string `json:"files_dir"`
 }
 
-// Check if server dir exists and has proper access rights
+// Check if server catalog exists and has proper access rights
 func initializeServerCatalog(path string) error {
 	dir, err := os.Open(path)
-	if err == nil {
-		info, _ := dir.Stat()
-		isNotDir := !info.IsDir()
-		validPermissions := (info.Mode().Perm() == 0777)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.New("Can not open server catalog:" + err.Error())
+	}
 
-		if isNotDir || !validPermissions {
-			return errors.New("Server catalog can not be initialized: invalid" +
-				" permissions")
-		}
+	info, _ := dir.Stat()
+	isNotDir := !info.IsDir()
+	isPermissionsInvalid := (info.Mode().Perm() != 0777)
+
+	if isNotDir || isPermissionsInvalid {
+		return errors.New(path + "has invalid permissions or is not a " +
+			"directory")
 	}
 
 	if os.IsNotExist(err) {
+		log.Println("Server catalog not found. Creating one in " + path)
 		err := os.Mkdir(path, 0777)
 		os.Chmod(path, 0777)
-		return err
+		return errors.New("Can not create server catalog:" + err.Error())
 	}
 	return err
 }
@@ -53,17 +56,21 @@ MakeFileServer creates FileServer reading its configuration from
 */
 func MakeFileServer(configFilename string) (FileServer, error) {
 	conf := new(fileServerConfig)
+
 	err := config.ReadConfig(&conf, configFilename)
-
-	if err == nil {
-		err = initializeServerCatalog(conf.FilesDir)
-
-		if err == nil {
-			file, _ := os.Open(conf.FilesDir)
-			return FileServer{conf.FilesDir, file}, nil
-		}
+	if err != nil {
+		return FileServer{}, errors.New(
+			"Can not open config file:" + err.Error())
 	}
-	return FileServer{}, err
+
+	err = initializeServerCatalog(conf.FilesDir)
+	if err != nil {
+		return FileServer{}, errors.New(
+			"Server catalog can not be initialized: " + err.Error())
+	}
+
+	file, _ := os.Open(conf.FilesDir)
+	return FileServer{conf.FilesDir, file}, nil
 }
 
 // Size returns size of file in request, or error
@@ -71,13 +78,13 @@ func (server FileServer) Size(ctx context.Context,
 	request *api.SizeRequest) (*api.SizeResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
-	fileInfo, err := os.Stat(filePath)
 
-	if err == nil {
-		return &api.SizeResponse{Size: uint64(fileInfo.Size())}, nil
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, err
+	return &api.SizeResponse{Size: uint64(fileInfo.Size())}, nil
 }
 
 // Read reads a file on server
@@ -85,22 +92,22 @@ func (server FileServer) Read(ctx context.Context,
 	request *api.ReadRequest) (*api.ReadResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
-	log.Println("Reading" + filePath)
 
 	file, err := os.Open(filePath)
-
-	if err == nil {
-		defer file.Close()
-		log.Println("Opened")
-		buffer := make([]byte, request.Size)
-		var len int
-		len, err = file.ReadAt(buffer, int64(request.Offset))
-		if len > 0 && (err == nil || err == io.EOF) {
-			log.Println("Read:" + string(buffer))
-			return &api.ReadResponse{Content: buffer[:len]}, nil
-		}
+	if err != nil {
+		return &api.ReadResponse{Content: nil}, errors.New("Fragment not exist")
 	}
-	return &api.ReadResponse{Content: nil}, err
+
+	defer file.Close()
+
+	buffer := make([]byte, request.Size)
+
+	len, err := file.ReadAt(buffer, int64(request.Offset))
+	if len > 0 && (err == nil || err == io.EOF) {
+		return &api.ReadResponse{Content: buffer[:len]}, nil
+	}
+	return &api.ReadResponse{Content: nil}, errors.New("Error reading fragment")
+
 }
 
 func (server FileServer) Write(ctx context.Context,
@@ -108,13 +115,13 @@ func (server FileServer) Write(ctx context.Context,
 
 	filePath := path.Join(server.storagePath, request.Inode)
 	file, err := os.OpenFile(filePath, os.O_RDWR, 0777)
-
-	if err == nil {
-		defer file.Close()
-		file.WriteAt(request.Content, int64(request.Offset))
-		return &api.WriteResponse{}, nil
+	if err != nil {
+		return nil, errors.New("Can not open fragment for writing")
 	}
-	return nil, err
+
+	defer file.Close()
+	_, err = file.WriteAt(request.Content, int64(request.Offset))
+	return &api.WriteResponse{}, err
 }
 
 // Create creates file or reports an error
@@ -122,17 +129,20 @@ func (server FileServer) Create(ctx context.Context,
 	request *api.CreateRequest) (*api.CreateResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
+
+	// Check that fragment is not exists
 	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
 		var file *os.File
 		file, err = os.Create(filePath)
 		defer file.Close()
 
-		if err == nil {
-			return &api.CreateResponse{}, nil
+		if err != nil {
+			return nil, errors.New("Can not create fragment: " + err.Error())
 		}
+		return &api.CreateResponse{}, nil
 	}
-	return nil, os.ErrExist
+	return nil, errors.New("Fragment exists")
 }
 
 // Remove removes file or reports an error
@@ -142,9 +152,9 @@ func (server FileServer) Remove(ctx context.Context,
 	filePath := path.Join(server.storagePath, request.Inode)
 	err := os.Remove(filePath)
 	if err == nil {
-		return &api.RemoveResponse{}, nil
+		return nil, errors.New("Can not remove fragment: " + err.Error())
 	}
-	return nil, err
+	return &api.RemoveResponse{}, nil
 }
 
 // ReportDiskSpace generates a brief report about used space on disk
@@ -152,12 +162,11 @@ func (server FileServer) ReportDiskSpace(ctx context.Context,
 	_ *api.Empty) (*api.DiskSpaceResponse, error) {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(server.storagePath, &stat)
-	if err == nil {
-		return &api.DiskSpaceResponse{
-				FreeBlocks:     int64(stat.Bavail),
-				BusyBlocks:     int64(stat.Blocks - stat.Bavail),
-				BlockSizeBytes: stat.Bsize},
-			nil
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	return &api.DiskSpaceResponse{
+		FreeBlocks:     int64(stat.Bavail),
+		BusyBlocks:     int64(stat.Blocks - stat.Bavail),
+		BlockSizeBytes: stat.Bsize}, nil
 }
