@@ -12,7 +12,6 @@ import (
 	syscall "golang.org/x/sys/unix"
 
 	api "github.com/Mexator/Go-vno/pkg/api/fileserver"
-	"github.com/Mexator/Go-vno/pkg/config"
 )
 
 // FileServer implements FileServerServer
@@ -20,10 +19,6 @@ type FileServer struct {
 	// Absolute path to folder
 	storagePath string
 	storageDir  *os.File
-}
-
-type fileServerConfig struct {
-	FilesDir string `json:"files_dir"`
 }
 
 // Check if server catalog exists and has proper access rights
@@ -55,22 +50,15 @@ func initializeServerCatalog(path string) error {
 MakeFileServer creates FileServer reading its configuration from
 `config.json` file.
 */
-func MakeFileServer(configFilename string) (FileServer, error) {
-	conf := new(fileServerConfig)
-
-	err := config.ReadConfig(&conf, configFilename)
-	if err != nil {
-		return FileServer{}, errors.Wrap(err, "Can not open config file")
-	}
-
-	err = initializeServerCatalog(conf.FilesDir)
+func MakeFileServer(storagePath string) (FileServer, error) {
+	err := initializeServerCatalog(storagePath)
 	if err != nil {
 		return FileServer{}, errors.Wrap(err,
 			"Server catalog can not be initialized")
 	}
 
-	file, _ := os.Open(conf.FilesDir)
-	return FileServer{conf.FilesDir, file}, nil
+	file, _ := os.Open(storagePath)
+	return FileServer{storagePath, file}, nil
 }
 
 // Size returns size of file in request, or error
