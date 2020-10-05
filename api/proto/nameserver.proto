@@ -2,6 +2,47 @@ syntax = "proto3";
 
 package nsapi;
 
+option go_package = "github.com/Mexator/Go-vno/pkg/api/nameserver";
+
 service NameServer {
-	// TODO
+	rpc Lookup(LookupRequest) returns (LookupResponse) {}
+	rpc Create(CreateRequest) returns (CreateResponse) {}
+	rpc Remove(RemoveRequest) returns (RemoveResponse) {}
+
+	rpc MapFS(MapFSRequest) returns (MapFSResponse) {}
+}
+
+message Node {
+	bool is_dir = 1;
+	string name = 2;
+	uint64 size = 3;
+}
+
+message LookupRequest {
+	string path = 1;
+}
+
+message LookupResponse {
+	repeated Node nodes = 1;
+}
+
+message CreateRequest {
+	string path = 1;
+}
+
+message CreateResponse {}
+
+message RemoveRequest {
+	string path = 1;
+}
+
+message RemoveResponse {}
+
+message MapFSRequest {
+	string path = 1;
+}
+
+message MapFSResponse {
+	string fsurl = 1;
+	string inode = 2;
 }
