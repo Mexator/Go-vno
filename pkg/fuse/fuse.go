@@ -6,8 +6,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 	"syscall"
+
+	"github.com/pkg/errors"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -16,6 +17,7 @@ import (
 
 	fsapi "github.com/Mexator/Go-vno/pkg/api/fileserver"
 	nsapi "github.com/Mexator/Go-vno/pkg/api/nameserver"
+	"github.com/Mexator/Go-vno/pkg/cache"
 )
 
 type (
@@ -35,10 +37,14 @@ type (
 	}
 )
 
+var (
+	grpcopts = []grpc.DialOption{grpc.WithInsecure()}
+)
+
 func (f FS) Root() (fs.Node, error) {
-	conn, err := grpc.Dial(f.Nsurl, grpc.WithInsecure())
+	conn, err := grpc.Dial(f.Nsurl, grpcopts...)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed connect to name server")
 	}
 	return Dir{path: "/", conn: nsapi.NewNameServerClient(conn)}, nil
 }
@@ -62,7 +68,7 @@ func (d Dir) Attr(ctx context.Context, a *fuse.Attr) error {
 func (d Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	resp, err := d.conn.Lookup(ctx, &nsapi.LookupRequest{Path: d.path})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed lookup in name server")
 	}
 
 	for _, n := range resp.Nodes {
@@ -84,7 +90,7 @@ func (d Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 func (d Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	resp, err := d.conn.Lookup(ctx, &nsapi.LookupRequest{Path: d.path})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed lookup in name server")
 	}
 
 	ret := []fuse.Dirent{}
@@ -114,32 +120,16 @@ func (f File) Attr(ctx context.Context, a *fuse.Attr) error {
 	return nil
 }
 
-// caching fileserver connections
-var fileservers sync.Map //map[string]fsapi.FileServerClient
-
-func getFileServer(fsurl string) (fsapi.FileServerClient, error) {
-	clint, ok := fileservers.Load(fsurl)
-	if ok {
-		return clint.(fsapi.FileServerClient), nil
-	}
-	conn, err := grpc.Dial(fsurl, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-	c := fsapi.NewFileServerClient(conn)
-	fileservers.Store(fsurl, c)
-	return c, nil
-}
-
 func (f File) ReadAll(ctx context.Context) ([]byte, error) {
 	resp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.path})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed to retrieve fileserver from nameserver")
 	}
-	cl, err := getFileServer(resp.Fsurl)
+	conn, err := cache.GrpcDial(resp.Fsurl, grpcopts...)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed to connect to fileserver")
 	}
+	cl := fsapi.NewFileServerClient(conn)
 
 	rresp, err := cl.Read(ctx, &fsapi.ReadRequest{
 		Inode:  resp.Inode,
@@ -147,23 +137,28 @@ func (f File) ReadAll(ctx context.Context) ([]byte, error) {
 		Size:   f.size,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed to read from fileserver")
 	}
 
 	return rresp.Content, nil
 }
 
-func (f File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
+func (f File) Write(
+	ctx context.Context,
+	req *fuse.WriteRequest,
+	resp *fuse.WriteResponse,
+) error {
 	mresp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.path})
 	if err != nil {
 		resp.Size = 0
-		return err
+		return errors.Wrap(err, "Failed to retrieve fileserver from nameserver")
 	}
-	cl, err := getFileServer(mresp.Fsurl)
+	conn, err := cache.GrpcDial(mresp.Fsurl, grpcopts...)
 	if err != nil {
 		resp.Size = 0
-		return err
+		return errors.Wrap(err, "Failed to connect fileserver")
 	}
+	cl := fsapi.NewFileServerClient(conn)
 
 	_, err = cl.Write(ctx, &fsapi.WriteRequest{
 		Inode:   mresp.Inode,
@@ -172,9 +167,9 @@ func (f File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Writ
 	})
 	if err != nil {
 		resp.Size = 0
-		return err
+		return errors.Wrap(err, "Failed to write to fileserver")
 	}
-	resp.Size = len(req.Data)
 
+	resp.Size = len(req.Data)
 	return nil
 }

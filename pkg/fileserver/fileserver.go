@@ -29,10 +29,9 @@ func initializeServerCatalog(path string) error {
 	}
 
 	info, _ := dir.Stat()
-	isNotDir := !info.IsDir()
 	isPermissionsInvalid := (info.Mode().Perm() != 0777)
 
-	if isNotDir || isPermissionsInvalid {
+	if !info.IsDir() || isPermissionsInvalid {
 		return errors.New(path + "has invalid permissions or is not a " +
 			"directory")
 	}
@@ -47,9 +46,9 @@ func initializeServerCatalog(path string) error {
 }
 
 /*
-MakeFileServer creates FileServer reading its configuration from
-`config.json` file.
-*/
+ * MakeFileServer creates FileServer reading its configuration from
+ * `config.json` file.
+ */
 func MakeFileServer(storagePath string) (FileServer, error) {
 	err := initializeServerCatalog(storagePath)
 	if err != nil {
@@ -62,11 +61,10 @@ func MakeFileServer(storagePath string) (FileServer, error) {
 }
 
 // Size returns size of file in request, or error
-func (server FileServer) Size(
+func (server *FileServer) Size(
 	ctx context.Context,
 	request *api.SizeRequest,
 ) (*api.SizeResponse, error) {
-
 	filePath := path.Join(server.storagePath, request.Inode)
 
 	fileInfo, err := os.Stat(filePath)
@@ -78,11 +76,10 @@ func (server FileServer) Size(
 }
 
 // Read reads a file on server
-func (server FileServer) Read(
+func (server *FileServer) Read(
 	ctx context.Context,
 	request *api.ReadRequest,
 ) (*api.ReadResponse, error) {
-
 	filePath := path.Join(server.storagePath, request.Inode)
 
 	file, err := os.Open(filePath)
@@ -102,11 +99,10 @@ func (server FileServer) Read(
 
 }
 
-func (server FileServer) Write(
+func (server *FileServer) Write(
 	ctx context.Context,
 	request *api.WriteRequest,
 ) (*api.WriteResponse, error) {
-
 	filePath := path.Join(server.storagePath, request.Inode)
 	file, err := os.OpenFile(filePath, os.O_RDWR, 0777)
 	if err != nil {
@@ -119,15 +115,14 @@ func (server FileServer) Write(
 }
 
 // Create creates file or reports an error
-func (server FileServer) Create(
+func (server *FileServer) Create(
 	ctx context.Context,
 	request *api.CreateRequest,
 ) (*api.CreateResponse, error) {
-
 	filePath := path.Join(server.storagePath, request.Inode)
 
-	// Check that fragment is not exists
 	_, err := os.Stat(filePath)
+	// Check that fragment is not exists
 	if os.IsNotExist(err) {
 		var file *os.File
 		file, err = os.Create(filePath)
@@ -142,21 +137,20 @@ func (server FileServer) Create(
 }
 
 // Remove removes file or reports an error
-func (server FileServer) Remove(
+func (server *FileServer) Remove(
 	ctx context.Context,
 	request *api.RemoveRequest,
 ) (*api.RemoveResponse, error) {
-
 	filePath := path.Join(server.storagePath, request.Inode)
 	err := os.Remove(filePath)
-	if err == nil {
+	if err != nil {
 		return nil, errors.Wrap(err, "Can not remove fragment")
 	}
 	return &api.RemoveResponse{}, nil
 }
 
 // ReportDiskSpace generates a brief report about used space on disk
-func (server FileServer) ReportDiskSpace(
+func (server *FileServer) ReportDiskSpace(
 	ctx context.Context,
 	_ *api.Empty,
 ) (*api.DiskSpaceResponse, error) {
@@ -165,8 +159,10 @@ func (server FileServer) ReportDiskSpace(
 	if err != nil {
 		return nil, err
 	}
-	return &api.DiskSpaceResponse{
+	resp := &api.DiskSpaceResponse{
 		FreeBlocks:     int64(stat.Bavail),
 		BusyBlocks:     int64(stat.Blocks - stat.Bavail),
-		BlockSizeBytes: stat.Bsize}, nil
+		BlockSizeBytes: stat.Bsize,
+	}
+	return resp, nil
 }

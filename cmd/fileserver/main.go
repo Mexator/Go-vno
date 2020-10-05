@@ -2,49 +2,46 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net"
+	"os"
 
-	"github.com/Mexator/Go-vno/pkg/config"
 	"github.com/Mexator/Go-vno/pkg/fileserver"
 
 	api "github.com/Mexator/Go-vno/pkg/api/fileserver"
 	"google.golang.org/grpc"
 )
 
-type fileServerConfig struct {
-	FilesDir string `json:"files_dir"`
-}
+var (
+	port = flag.Uint64("p", 8080, "Port for grpc name server")
+	host = flag.String("h", "", "Hostname for grpc name server")
+)
 
 func main() {
-	config := flag.String("config", "./config.json", "Path to JSON config file")
-	flag.Parse()
-	if err := startFileServer(*config); err != nil {
-		log.Fatal(err)
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "  %s FILEDIR\n", os.Args[0])
+		flag.PrintDefaults()
 	}
-	log.Print("Server started")
-}
+	flag.Parse()
+	if flag.NArg() != 1 {
+		flag.Usage()
+		os.Exit(1)
+	}
 
-func startFileServer(configPath string) error {
 	s := grpc.NewServer()
-
-	conf := new(fileServerConfig)
-
-	err := config.ReadConfig(&conf, configPath)
-
-	srv, err := fileserver.MakeFileServer(conf.FilesDir)
+	srv, err := fileserver.MakeFileServer(flag.Arg(0))
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 	api.RegisterFileServerServer(s, &srv)
 
-	listener, err := net.Listen("tcp", ":8080")
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", *host, *port))
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
 	if err := s.Serve(listener); err != nil {
-		return err
+		log.Fatal(err)
 	}
-	return nil
 }

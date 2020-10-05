@@ -28,6 +28,7 @@ message LookupResponse {
 
 message CreateRequest {
 	string path = 1;
+	bool is_dir = 2;
 }
 
 message CreateResponse {}
