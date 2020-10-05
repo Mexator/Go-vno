@@ -111,8 +111,12 @@ func NewServer(servers []string) nsapi.NameServerServer {
 }
 
 func (r *root) lookup(path string) (entry, error) {
+	if path == "" || path == "/" {
+		return &r.dir, nil
+	}
+
 	sep := string(os.PathSeparator)
-	parts := strings.Split(path, sep)
+	parts := strings.Split(path, sep)[1:] // starts with /
 
 	var d *directory = &r.dir
 	cur := sep
@@ -178,6 +182,7 @@ func (g *GRPCServer) Create(
 	if err != nil {
 		return nil, errors.Wrap(err, "Create")
 	}
+
 	dir, ok := ent.(*directory)
 	if !ok {
 		return nil, errors.Wrap(ErrDirFile, "Create")

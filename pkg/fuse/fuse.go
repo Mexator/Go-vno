@@ -2,12 +2,13 @@ package fuse
 
 import (
 	"context"
-	"errors"
 	"hash/fnv"
 	"log"
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"github.com/pkg/errors"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
