@@ -22,26 +22,27 @@ import (
 
 type (
 	GRPCServer struct {
-		servers   []string
-		replicate uint
-		root      root
+		servers      []string
+		replicatecnt uint
+		root         root
 	}
 	root struct{ dir directory }
 
-	ent interface {
+	entry interface {
 		AsNode() *nsapi.Node
+		Remove(context.Context) error
 	}
 
 	directory struct {
 		name    string
-		entries sync.Map // map[string]ent
+		entries sync.Map // map[string]entry
 	}
 	file struct {
 		name string
 		size uint64
 
 		inode       string
-		nameservers []string
+		fileservers []string
 	}
 
 	NameServerError struct {
@@ -72,15 +73,44 @@ func (d *directory) AsNode() *nsapi.Node {
 	return &nsapi.Node{IsDir: false, Name: d.name, Size: 4096}
 }
 
+func (d *directory) Remove(ctx context.Context) error {
+	var err error
+	d.entries.Range(func(k, nodeint interface{}) bool {
+		if e := nodeint.(entry).Remove(ctx); e != nil {
+			err = e
+		}
+		d.entries.Delete(k)
+		return true
+	})
+	return err
+}
+
 func (f *file) AsNode() *nsapi.Node {
 	return &nsapi.Node{IsDir: true, Name: f.name, Size: f.size}
 }
 
-func NewServer(servers []string) nsapi.NameServerServer {
-	return &GRPCServer{servers: servers, replicate: 2}
+func (f *file) Remove(ctx context.Context) error {
+	var err error
+	for _, fsurl := range f.fileservers {
+		conn, e := cache.GrpcDial(fsurl, grpcopts...)
+		if err != nil {
+			err = e
+		}
+		fs := fsapi.NewFileServerClient(conn)
+
+		_, e = fs.Remove(ctx, &fsapi.RemoveRequest{Inode: f.inode})
+		if err != nil {
+			err = e
+		}
+	}
+	return err
 }
 
-func (r *root) lookup(path string) (*directory, error) {
+func NewServer(servers []string) nsapi.NameServerServer {
+	return &GRPCServer{servers: servers, replicatecnt: 2}
+}
+
+func (r *root) lookup(path string) (entry, error) {
 	sep := string(os.PathSeparator)
 	parts := strings.Split(path, sep)
 
@@ -93,10 +123,7 @@ func (r *root) lookup(path string) (*directory, error) {
 		if !ok {
 			return nil, ErrDirNotExists
 		}
-		d, ok = ent.(*directory)
-		if !ok {
-			return nil, ErrDirFile
-		}
+		return ent.(entry), nil
 	}
 
 	return d, nil
@@ -117,13 +144,17 @@ func (g *GRPCServer) Lookup(
 	ctx context.Context,
 	lreq *nsapi.LookupRequest,
 ) (*nsapi.LookupResponse, error) {
-	d, err := g.root.lookup(lreq.Path)
+	ent, err := g.root.lookup(lreq.Path)
 	if err != nil {
-		return nil, errors.Wrap(err, "Lookup failed")
+		return nil, errors.Wrap(err, "Lookup")
+	}
+	d, ok := ent.(*directory)
+	if !ok {
+		return nil, errors.Wrap(ErrDirFile, "Lookup")
 	}
 	nodes := []*nsapi.Node{}
 	d.entries.Range(func(_, value interface{}) bool {
-		nodes = append(nodes, value.(ent).AsNode())
+		nodes = append(nodes, value.(entry).AsNode())
 		return true
 	})
 	return &nsapi.LookupResponse{Nodes: nodes}, nil
@@ -133,24 +164,37 @@ func (g *GRPCServer) Create(
 	ctx context.Context,
 	creq *nsapi.CreateRequest,
 ) (*nsapi.CreateResponse, error) {
-	d, node := path.Split(creq.Path)
-	dir, err := g.root.lookup(d)
-	if err != nil {
-		return nil, errors.Wrap(err, "Create: Lookup failed")
+	var d string
+	var node string
+
+	if creq.IsDir {
+		node = path.Base(creq.Path)
+		d = path.Join(creq.Path, "..")
+	} else {
+		d, node = path.Split(creq.Path)
 	}
 
-	_, ok := dir.entries.Load(node)
+	ent, err := g.root.lookup(d)
+	if err != nil {
+		return nil, errors.Wrap(err, "Create")
+	}
+	dir, ok := ent.(*directory)
+	if !ok {
+		return nil, errors.Wrap(ErrDirFile, "Create")
+	}
+
+	_, ok = dir.entries.Load(node)
 	if ok {
-		return nil, errors.Wrap(err, "Create: entry already exists")
+		return nil, errors.Wrap(ErrFileExists, "Create")
 	}
 
 	if creq.IsDir {
-		var e ent = &directory{name: node}
+		var e entry = &directory{name: node}
 		dir.entries.Store(node, e)
 		return &nsapi.CreateResponse{}, nil
 	}
 
-	fileservers := g.pickServers(int(g.replicate))
+	fileservers := g.pickServers(int(g.replicatecnt))
 	inode := getInode()
 
 	// Falsestarting servers in order to get some errors beforehand
@@ -161,53 +205,78 @@ func (g *GRPCServer) Create(
 		}
 	}
 
-	for i := 0; i < len(fileservers); i++ {
+	var i int
+	var e entry
+
+	for i = 0; i < len(fileservers); i++ {
 		conn, _ := cache.GrpcDial(fileservers[i], grpcopts...)
 		f := fsapi.NewFileServerClient(conn)
 		_, err := f.Create(ctx, &fsapi.CreateRequest{Inode: inode})
-		if err == nil {
-			continue
+		if err != nil {
+			goto cleanup
 		}
-		for ; i >= 0; i-- {
-			conn, _ := cache.GrpcDial(fileservers[i], grpcopts...)
-			f := fsapi.NewFileServerClient(conn)
-			f.Remove(ctx, &fsapi.RemoveRequest{Inode: inode})
-		}
-		return nil, err
 	}
 
-	var e ent = &file{name: node, inode: inode}
+	e = &file{name: node, inode: inode, fileservers: fileservers}
 	dir.entries.Store(node, e)
 	return &nsapi.CreateResponse{}, nil
+
+cleanup:
+	for ; i >= 0; i-- {
+		conn, _ := cache.GrpcDial(fileservers[i], grpcopts...)
+		f := fsapi.NewFileServerClient(conn)
+		f.Remove(ctx, &fsapi.RemoveRequest{Inode: inode})
+	}
+	return nil, err
 }
 
 func (g *GRPCServer) Remove(
 	ctx context.Context,
 	rreq *nsapi.RemoveRequest,
 ) (*nsapi.RemoveResponse, error) {
-	panic("Todo")
-	return nil, nil
+	d, fname := path.Split(rreq.Path)
+	dirint, err := g.root.lookup(d)
+	if err != nil {
+		return nil, errors.Wrap(err, "Remove")
+	}
+	dir := dirint.(*directory)
+	node, ok := dir.entries.Load(fname)
+	if !ok {
+		return nil, ErrFileNotExists
+	}
+
+	err = node.(entry).Remove(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dir.entries.Delete(fname)
+	return &nsapi.RemoveResponse{}, nil
 }
 
+// MapFS maps
 func (g *GRPCServer) MapFS(
 	ctx context.Context,
 	mreq *nsapi.MapFSRequest,
 ) (*nsapi.MapFSResponse, error) {
 	d, fname := path.Split(mreq.Path)
-	dir, err := g.root.lookup(d)
+	ent, err := g.root.lookup(d)
 	if err != nil {
-		return nil, errors.Wrap(err, "MapFS: Lookup failed")
+		return nil, errors.Wrap(err, "MapFS")
 	}
-
-	ent, ok := dir.entries.Load(fname)
+	dir, ok := ent.(*directory)
 	if !ok {
-		return nil, ErrFileNotExists
+		return nil, errors.Wrap(ErrDirFile, "MapFS")
 	}
 
-	file, ok := ent.(*file)
+	e, ok := dir.entries.Load(fname)
 	if !ok {
-		return nil, ErrFileDir
+		return nil, errors.Wrap(ErrFileNotExists, "MapFS")
 	}
 
-	return &nsapi.MapFSResponse{Fsurl: file.nameservers[0], Inode: file.inode}, nil
+	file, ok := e.(*file)
+	if !ok {
+		return nil, errors.Wrap(ErrFileDir, "MapFS")
+	}
+
+	return &nsapi.MapFSResponse{Fsurl: file.fileservers[0], Inode: file.inode}, nil
 }
