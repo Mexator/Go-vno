@@ -6,7 +6,7 @@ import (
 )
 
 // ReadConfig reads JSON config file to a dest, which should be a pointer to
-// structure
+// structure. Is a wrapper upon `encoding/json/Decoder`
 func ReadConfig(dest interface{}, filename string) error {
 	file, err := os.Open(filename)
 	if err == nil {
