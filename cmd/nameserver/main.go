@@ -31,7 +31,7 @@ func main() {
 	srv := ns.NewServer(lines)
 	nsapi.RegisterNameServerServer(s, srv)
 
-	l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
+	l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", *host, *port))
 	if err != nil {
 		log.Fatal(err)
 	}
