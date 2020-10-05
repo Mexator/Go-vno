@@ -74,8 +74,10 @@ func MakeFileServer(configFilename string) (FileServer, error) {
 }
 
 // Size returns size of file in request, or error
-func (server FileServer) Size(ctx context.Context,
-	request *api.SizeRequest) (*api.SizeResponse, error) {
+func (server FileServer) Size(
+	ctx context.Context,
+	request *api.SizeRequest,
+) (*api.SizeResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
 
@@ -88,8 +90,10 @@ func (server FileServer) Size(ctx context.Context,
 }
 
 // Read reads a file on server
-func (server FileServer) Read(ctx context.Context,
-	request *api.ReadRequest) (*api.ReadResponse, error) {
+func (server FileServer) Read(
+	ctx context.Context,
+	request *api.ReadRequest,
+) (*api.ReadResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
 
@@ -110,8 +114,10 @@ func (server FileServer) Read(ctx context.Context,
 
 }
 
-func (server FileServer) Write(ctx context.Context,
-	request *api.WriteRequest) (*api.WriteResponse, error) {
+func (server FileServer) Write(
+	ctx context.Context,
+	request *api.WriteRequest,
+) (*api.WriteResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
 	file, err := os.OpenFile(filePath, os.O_RDWR, 0777)
@@ -125,8 +131,10 @@ func (server FileServer) Write(ctx context.Context,
 }
 
 // Create creates file or reports an error
-func (server FileServer) Create(ctx context.Context,
-	request *api.CreateRequest) (*api.CreateResponse, error) {
+func (server FileServer) Create(
+	ctx context.Context,
+	request *api.CreateRequest,
+) (*api.CreateResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
 
@@ -146,8 +154,10 @@ func (server FileServer) Create(ctx context.Context,
 }
 
 // Remove removes file or reports an error
-func (server FileServer) Remove(ctx context.Context,
-	request *api.RemoveRequest) (*api.RemoveResponse, error) {
+func (server FileServer) Remove(
+	ctx context.Context,
+	request *api.RemoveRequest,
+) (*api.RemoveResponse, error) {
 
 	filePath := path.Join(server.storagePath, request.Inode)
 	err := os.Remove(filePath)
@@ -158,8 +168,10 @@ func (server FileServer) Remove(ctx context.Context,
 }
 
 // ReportDiskSpace generates a brief report about used space on disk
-func (server FileServer) ReportDiskSpace(ctx context.Context,
-	_ *api.Empty) (*api.DiskSpaceResponse, error) {
+func (server FileServer) ReportDiskSpace(
+	ctx context.Context,
+	_ *api.Empty,
+) (*api.DiskSpaceResponse, error) {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(server.storagePath, &stat)
 	if err != nil {
