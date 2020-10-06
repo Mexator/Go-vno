@@ -5,7 +5,7 @@ package nsapi;
 option go_package = "github.com/Mexator/Go-vno/pkg/api/nameserver";
 
 service NameServer {
-	rpc ReadDirAll(LookupRequest) returns (LookupResponse) {}
+	rpc ReadDirAll(ReadDirAllRequest) returns (ReadDirAllResponse) {}
 	rpc Create(CreateRequest) returns (CreateResponse) {}
 	rpc Remove(RemoveRequest) returns (RemoveResponse) {}
 
@@ -20,11 +20,11 @@ message Node {
 	uint64 size = 3;
 }
 
-message LookupRequest {
+message ReadDirAllRequest {
 	string path = 1;
 }
 
-message LookupResponse {
+message ReadDirAllResponse {
 	repeated Node nodes = 1;
 }
 
