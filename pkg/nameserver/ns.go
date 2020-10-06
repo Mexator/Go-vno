@@ -39,7 +39,6 @@ type (
 	}
 	file struct {
 		name string
-		size uint64
 
 		inode       string
 		fileservers []string
@@ -86,7 +85,7 @@ func (d *directory) Remove(ctx context.Context) error {
 }
 
 func (f *file) AsNode() *nsapi.Node {
-	return &nsapi.Node{IsDir: false, Name: f.name, Size: f.size}
+	return &nsapi.Node{IsDir: false, Name: f.name}
 }
 
 func (f *file) Remove(ctx context.Context) error {
@@ -111,10 +110,6 @@ func NewServer(servers []string) nsapi.NameServerServer {
 }
 
 func (r *root) lookup(path string) (dirEntry, error) {
-	if path == "" || path == "/" {
-		return &r.dir, nil
-	}
-
 	sep := string(os.PathSeparator)
 	parts := strings.Split(path, sep)[1:] // starts with /
 
@@ -122,12 +117,20 @@ func (r *root) lookup(path string) (dirEntry, error) {
 	cur := sep
 
 	for _, p := range parts {
+		if p == "" {
+			return d, nil
+		}
+
 		ent, ok := d.entries.Load(p)
 		cur = cur + sep + p
 		if !ok {
 			return nil, ErrDirNotExists
 		}
-		return ent.(dirEntry), nil
+
+		d, ok = ent.(*directory)
+		if !ok {
+			return nil, ErrDirFile
+		}
 	}
 
 	return d, nil
@@ -146,8 +149,8 @@ func (g *GRPCServer) pickServers(n int) []string {
 
 func (g *GRPCServer) ReadDirAll(
 	ctx context.Context,
-	lreq *nsapi.LookupRequest,
-) (*nsapi.LookupResponse, error) {
+	lreq *nsapi.ReadDirAllRequest,
+) (*nsapi.ReadDirAllResponse, error) {
 	ent, err := g.root.lookup(lreq.Path)
 	if err != nil {
 		return nil, errors.Wrap(err, "Lookup")
@@ -161,22 +164,16 @@ func (g *GRPCServer) ReadDirAll(
 		nodes = append(nodes, value.(dirEntry).AsNode())
 		return true
 	})
-	return &nsapi.LookupResponse{Nodes: nodes}, nil
+	return &nsapi.ReadDirAllResponse{Nodes: nodes}, nil
 }
 
 func (g *GRPCServer) Create(
 	ctx context.Context,
 	creq *nsapi.CreateRequest,
 ) (*nsapi.CreateResponse, error) {
-	var d string
-	var node string
+	var d, node string
 
-	if creq.IsDir {
-		node = path.Base(creq.Path)
-		d = path.Join(creq.Path, "..")
-	} else {
-		d, node = path.Split(creq.Path)
-	}
+	d, node = path.Split(creq.Path)
 
 	ent, err := g.root.lookup(d)
 	if err != nil {
@@ -194,7 +191,7 @@ func (g *GRPCServer) Create(
 	}
 
 	if creq.IsDir {
-		var e dirEntry = &directory{name: node}
+		var e dirEntry = &directory{name: node, entries: sync.Map{}}
 		dir.entries.Store(node, e)
 		return &nsapi.CreateResponse{}, nil
 	}
