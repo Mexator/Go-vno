@@ -106,7 +106,19 @@ func (f *file) Remove(ctx context.Context) error {
 }
 
 func NewServer(servers []string) nsapi.NameServerServer {
-	return &GRPCServer{servers: servers, replicatecnt: 2}
+	var serversset map[string]struct{}
+
+	for _, s := range servers {
+		serversset[s] = struct{}{}
+	}
+
+	var uniqservers []string
+
+	for s := range serversset {
+		uniqservers = append(uniqservers, s)
+	}
+
+	return &GRPCServer{servers: uniqservers, replicatecnt: 2}
 }
 
 func (r *root) lookup(path string) (dirEntry, error) {
