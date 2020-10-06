@@ -28,14 +28,14 @@ type (
 	}
 	root struct{ dir directory }
 
-	entry interface {
+	dirEntry interface {
 		AsNode() *nsapi.Node
 		Remove(context.Context) error
 	}
 
 	directory struct {
 		name    string
-		entries sync.Map // map[string]entry
+		entries sync.Map // map[string]dirEntry
 	}
 	file struct {
 		name string
@@ -70,13 +70,13 @@ func getInode() string {
 }
 
 func (d *directory) AsNode() *nsapi.Node {
-	return &nsapi.Node{IsDir: false, Name: d.name, Size: 4096}
+	return &nsapi.Node{IsDir: true, Name: d.name, Size: 4096}
 }
 
 func (d *directory) Remove(ctx context.Context) error {
 	var err error
 	d.entries.Range(func(k, nodeint interface{}) bool {
-		if e := nodeint.(entry).Remove(ctx); e != nil {
+		if e := nodeint.(dirEntry).Remove(ctx); e != nil {
 			err = e
 		}
 		d.entries.Delete(k)
@@ -86,7 +86,7 @@ func (d *directory) Remove(ctx context.Context) error {
 }
 
 func (f *file) AsNode() *nsapi.Node {
-	return &nsapi.Node{IsDir: true, Name: f.name, Size: f.size}
+	return &nsapi.Node{IsDir: false, Name: f.name, Size: f.size}
 }
 
 func (f *file) Remove(ctx context.Context) error {
@@ -110,7 +110,7 @@ func NewServer(servers []string) nsapi.NameServerServer {
 	return &GRPCServer{servers: servers, replicatecnt: 2}
 }
 
-func (r *root) lookup(path string) (entry, error) {
+func (r *root) lookup(path string) (dirEntry, error) {
 	if path == "" || path == "/" {
 		return &r.dir, nil
 	}
@@ -127,7 +127,7 @@ func (r *root) lookup(path string) (entry, error) {
 		if !ok {
 			return nil, ErrDirNotExists
 		}
-		return ent.(entry), nil
+		return ent.(dirEntry), nil
 	}
 
 	return d, nil
@@ -144,7 +144,7 @@ func (g *GRPCServer) pickServers(n int) []string {
 	return a[:n]
 }
 
-func (g *GRPCServer) Lookup(
+func (g *GRPCServer) ReadDirAll(
 	ctx context.Context,
 	lreq *nsapi.LookupRequest,
 ) (*nsapi.LookupResponse, error) {
@@ -158,7 +158,7 @@ func (g *GRPCServer) Lookup(
 	}
 	nodes := []*nsapi.Node{}
 	d.entries.Range(func(_, value interface{}) bool {
-		nodes = append(nodes, value.(entry).AsNode())
+		nodes = append(nodes, value.(dirEntry).AsNode())
 		return true
 	})
 	return &nsapi.LookupResponse{Nodes: nodes}, nil
@@ -194,7 +194,7 @@ func (g *GRPCServer) Create(
 	}
 
 	if creq.IsDir {
-		var e entry = &directory{name: node}
+		var e dirEntry = &directory{name: node}
 		dir.entries.Store(node, e)
 		return &nsapi.CreateResponse{}, nil
 	}
@@ -211,7 +211,7 @@ func (g *GRPCServer) Create(
 	}
 
 	var i int
-	var e entry
+	var e dirEntry
 
 	for i = 0; i < len(fileservers); i++ {
 		conn, _ := cache.GrpcDial(fileservers[i], grpcopts...)
@@ -250,7 +250,7 @@ func (g *GRPCServer) Remove(
 		return nil, ErrFileNotExists
 	}
 
-	err = node.(entry).Remove(ctx)
+	err = node.(dirEntry).Remove(ctx)
 	if err != nil {
 		return nil, err
 	}

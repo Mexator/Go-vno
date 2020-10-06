@@ -14,6 +14,10 @@ import (
 	api "github.com/Mexator/Go-vno/pkg/api/fileserver"
 )
 
+const (
+	serverCatalogPerms os.FileMode = 0777
+)
+
 // FileServer implements FileServerServer
 type FileServer struct {
 	// Absolute path to folder
@@ -28,20 +32,22 @@ func initializeServerCatalog(path string) error {
 		return errors.Wrap(err, "Can not open server catalog:")
 	}
 
+	if os.IsNotExist(err) {
+		log.Println("Server catalog not found. Creating one in " + path)
+		err := os.Mkdir(path, serverCatalogPerms)
+		// Because of fucking umask
+		os.Chmod(path, serverCatalogPerms)
+		return errors.Wrap(err, "Can not create server catalog")
+	}
+
 	info, _ := dir.Stat()
-	isPermissionsInvalid := (info.Mode().Perm() != 0777)
+	isPermissionsInvalid := (info.Mode().Perm() != serverCatalogPerms)
 
 	if !info.IsDir() || isPermissionsInvalid {
 		return errors.New(path + "has invalid permissions or is not a " +
 			"directory")
 	}
 
-	if os.IsNotExist(err) {
-		log.Println("Server catalog not found. Creating one in " + path)
-		err := os.Mkdir(path, 0777)
-		os.Chmod(path, 0777)
-		return errors.Wrap(err, "Can not create server catalog")
-	}
 	return err
 }
 
