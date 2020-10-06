@@ -3,11 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
-	"os"
-	"strings"
 
 	nsapi "github.com/Mexator/Go-vno/pkg/api/nameserver"
 	ns "github.com/Mexator/Go-vno/pkg/nameserver"
@@ -15,20 +12,21 @@ import (
 )
 
 var (
-	port = flag.Uint64("p", 8080, "Port for grpc name server")
+	port = flag.Uint64("p", 3000, "Port for grpc name server")
 	host = flag.String("h", "", "Hostname for grpc name server")
 )
 
 func main() {
 	flag.Parse()
-	content, err := ioutil.ReadAll(os.Stdin)
-	if err != nil {
-		log.Fatal(err)
+
+	var fileservers []string
+
+	for i := 0; i < flag.NArg(); i++ {
+		fileservers = append(fileservers, flag.Arg(0))
 	}
-	lines := strings.Split(string(content), "\n")
 
 	s := grpc.NewServer()
-	srv := ns.NewServer(lines)
+	srv := ns.NewServer(fileservers)
 	nsapi.RegisterNameServerServer(s, srv)
 
 	log.Printf("Server is listening on %s:%d", *host, *port)
