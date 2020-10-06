@@ -22,7 +22,7 @@ func main() {
 	var fileservers []string
 
 	for i := 0; i < flag.NArg(); i++ {
-		fileservers = append(fileservers, flag.Arg(0))
+		fileservers = append(fileservers, flag.Arg(i))
 	}
 
 	s := grpc.NewServer()
