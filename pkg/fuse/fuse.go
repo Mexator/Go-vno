@@ -66,7 +66,7 @@ func (d Dir) Attr(ctx context.Context, a *fuse.Attr) error {
 }
 
 func (d Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
-	resp, err := d.conn.Lookup(ctx, &nsapi.LookupRequest{Path: d.path})
+	resp, err := d.conn.ReadDirAll(ctx, &nsapi.LookupRequest{Path: d.path})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed lookup in name server")
 	}
@@ -88,7 +88,7 @@ func (d Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 }
 
 func (d Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
-	resp, err := d.conn.Lookup(ctx, &nsapi.LookupRequest{Path: d.path})
+	resp, err := d.conn.ReadDirAll(ctx, &nsapi.LookupRequest{Path: d.path})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed lookup in name server")
 	}

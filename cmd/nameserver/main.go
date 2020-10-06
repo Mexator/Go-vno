@@ -31,6 +31,7 @@ func main() {
 	srv := ns.NewServer(lines)
 	nsapi.RegisterNameServerServer(s, srv)
 
+	log.Printf("Server is listening on %s:%d", *host, *port)
 	l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", *host, *port))
 	if err != nil {
 		log.Fatal(err)

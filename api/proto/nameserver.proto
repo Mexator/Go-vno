@@ -5,10 +5,12 @@ package nsapi;
 option go_package = "github.com/Mexator/Go-vno/pkg/api/nameserver";
 
 service NameServer {
-	rpc Lookup(LookupRequest) returns (LookupResponse) {}
+	rpc ReadDirAll(LookupRequest) returns (LookupResponse) {}
 	rpc Create(CreateRequest) returns (CreateResponse) {}
 	rpc Remove(RemoveRequest) returns (RemoveResponse) {}
 
+	// Return url of fileserver that stores needed file together with
+	// inode of the file on that server  
 	rpc MapFS(MapFSRequest) returns (MapFSResponse) {}
 }
 
