@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	port       = flag.Uint64("p", 8080, "Port for grpc file server")
+	port       = flag.Uint64("p", 2000, "Port for grpc file server")
 	host       = flag.String("h", "", "Hostname for grpc file server")
 	storageDir = flag.String(
 		"f",
