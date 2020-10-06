@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 
 	"github.com/Mexator/Go-vno/pkg/fileserver"
 
@@ -14,20 +13,17 @@ import (
 )
 
 var (
-	port = flag.Uint64("p", 8080, "Port for grpc name server")
-	host = flag.String("h", "", "Hostname for grpc name server")
+	port       = flag.Uint64("p", 8080, "Port for grpc file server")
+	host       = flag.String("h", "", "Hostname for grpc file server")
+	storageDir = flag.String(
+		"f",
+		"/var/data",
+		"Folder to stored files on the server",
+	)
 )
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "  %s FILEDIR\n", os.Args[0])
-		flag.PrintDefaults()
-	}
 	flag.Parse()
-	if flag.NArg() != 1 {
-		flag.Usage()
-		os.Exit(1)
-	}
 
 	s := grpc.NewServer()
 	srv, err := fileserver.MakeFileServer(flag.Arg(0))

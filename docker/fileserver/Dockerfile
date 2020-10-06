@@ -4,4 +4,4 @@ from alpine
 add build/fileserver /
 
 run mkdir /var/data; chmod 777 /var/data
-cmd ["/fileserver", "/var/data"]
+cmd ["/fileserver"]
