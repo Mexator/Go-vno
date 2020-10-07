@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+    nameserver:
+        image: mexator/nameserver
+        ports: 
+            - "3000:3000"
+
+    fileserver:
+        image: mexator/fileserver
+        command: 'nameserver:3000 /data'
