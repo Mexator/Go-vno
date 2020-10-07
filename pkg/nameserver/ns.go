@@ -25,27 +25,20 @@ type (
 		replicatecnt uint
 		root         root
 	}
-
-	NameServerError struct {
-		fmt  string
-		name string
-	}
 )
 
 var (
 	grpcopts = []grpc.DialOption{grpc.WithInsecure()}
 
-	ErrNoFileSevers = fmt.Errorf("Needed number of fileservers is not " +
-		"available",
-	)
-
-	ErrFileExists    = fmt.Errorf("File already exists")
-	ErrFileNotExists = fmt.Errorf("File does not exists")
-	ErrDirNotExists  = fmt.Errorf("Directory does not exists")
-	ErrDirIsFile     = fmt.Errorf("Directory is actually a file")
-	ErrFileIsDir     = fmt.Errorf("File is actually a directory")
-
-	ErrNoPeerInfo = fmt.Errorf("Cannot obtain name server address from context")
+	ErrDirIsFile      = fmt.Errorf("Directory is actually a file")
+	ErrDirNotExists   = fmt.Errorf("Directory does not exists")
+	ErrEntryExists    = fmt.Errorf("Entry already exists")
+	ErrEntryNotExists = fmt.Errorf("Entry does not exists")
+	ErrFileExists     = fmt.Errorf("File already exists")
+	ErrFileIsDir      = fmt.Errorf("File is actually a directory")
+	ErrFileNotExists  = fmt.Errorf("File does not exists")
+	ErrNoFileSevers   = fmt.Errorf("Needed number of fileservers is not available")
+	ErrNoPeerInfo     = fmt.Errorf("Cannot obtain name server address from context")
 )
 
 // Generates unique IDs for file
@@ -86,17 +79,15 @@ func (g *GRPCServer) ReadDirAll(
 	ctx context.Context,
 	lreq *nsapi.ReadDirAllRequest,
 ) (*nsapi.ReadDirAllResponse, error) {
-	ent, err := g.root.lookup(lreq.Path)
+	d, err := g.root.lookup_dir(lreq.Path)
 	if err != nil {
 		return nil, errors.Wrap(err, "Lookup")
 	}
-	d, ok := ent.(*directory)
-	if !ok {
-		return nil, errors.Wrap(ErrDirIsFile, "Lookup")
-	}
 	nodes := []*nsapi.Node{}
-	d.entries.Range(func(_, value interface{}) bool {
-		nodes = append(nodes, value.(dirEntry).AsNode())
+	d.entries.Range(func(k, value interface{}) bool {
+		node := value.(dirEntry).AsNode()
+		node.Name = k.(string)
+		nodes = append(nodes, node)
 		return true
 	})
 	return &nsapi.ReadDirAllResponse{Nodes: nodes}, nil
@@ -110,24 +101,18 @@ func (g *GRPCServer) Create(
 
 	d, node = path.Split(creq.Path)
 
-	ent, err := g.root.lookup(d)
+	dir, err := g.root.lookup_dir(d)
 	if err != nil {
 		return nil, errors.Wrap(err, "Create")
 	}
 
-	dir, ok := ent.(*directory)
-	if !ok {
-		return nil, errors.Wrap(ErrDirIsFile, "Create")
-	}
-
-	_, ok = dir.entries.Load(node)
+	_, ok := dir.entries.Load(node)
 	if ok {
 		return nil, errors.Wrap(ErrFileExists, "Create")
 	}
 
 	if creq.IsDir {
-		var e dirEntry = &directory{name: node, entries: sync.Map{}}
-		dir.entries.Store(node, e)
+		dir.entries.Store(node, &directory{})
 		return &nsapi.CreateResponse{}, nil
 	}
 
@@ -146,7 +131,6 @@ func (g *GRPCServer) Create(
 	}
 
 	var i int
-	var e dirEntry
 
 	for i = 0; i < len(fileservers); i++ {
 		conn, _ := cache.GrpcDial(fileservers[i], grpcopts...)
@@ -158,8 +142,7 @@ func (g *GRPCServer) Create(
 		}
 	}
 
-	e = &file{name: node, inode: inode, fileservers: fileservers}
-	dir.entries.Store(node, e)
+	dir.entries.Store(node, &file{inode: inode, fileservers: fileservers})
 	return &nsapi.CreateResponse{}, nil
 
 cleanup:
@@ -171,16 +154,48 @@ cleanup:
 	return nil, err
 }
 
+func (g *GRPCServer) Rename(
+	ctx context.Context,
+	rreq *nsapi.RenameRequest,
+) (*nsapi.RenameResponse, error) {
+	log.Println("Rename", rreq)
+	from, err := g.root.lookup_dir(rreq.FromDir)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Rename: Failed to find directory `%s'", rreq.FromDir)
+	}
+
+	to, err := g.root.lookup_dir(rreq.ToDir)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Rename: Failed to find directory `%s'")
+	}
+
+	_, ok := to.entries.Load(rreq.ToName)
+	if ok {
+		fmt := "Rename: Entry `%s' in `%s' already exists"
+		return nil, errors.Wrapf(ErrEntryExists, fmt, rreq.ToName, rreq.ToDir)
+	}
+
+	ent_int, ok := from.entries.LoadAndDelete(rreq.FromName)
+	if !ok {
+		fmt := "Rename: Failed to find entry `%s' in `%s'"
+		return nil, errors.Wrapf(ErrEntryNotExists, fmt, rreq.FromName, rreq.FromDir)
+	}
+
+	to.entries.Store(rreq.ToName, ent_int.(dirEntry))
+	log.Println("Ok Rename", rreq)
+
+	return &nsapi.RenameResponse{}, nil
+}
+
 func (g *GRPCServer) Remove(
 	ctx context.Context,
 	rreq *nsapi.RemoveRequest,
 ) (*nsapi.RemoveResponse, error) {
 	d, fname := path.Split(rreq.Path)
-	dirint, err := g.root.lookup(d)
+	dir, err := g.root.lookup_dir(d)
 	if err != nil {
 		return nil, errors.Wrap(err, "Remove")
 	}
-	dir := dirint.(*directory)
 	node, ok := dir.entries.Load(fname)
 	if !ok {
 		return nil, ErrFileNotExists
@@ -201,26 +216,22 @@ func (g *GRPCServer) MapFS(
 	mreq *nsapi.MapFSRequest,
 ) (*nsapi.MapFSResponse, error) {
 	d, fname := path.Split(mreq.Path)
-	ent, err := g.root.lookup(d)
+	dir, err := g.root.lookup_dir(d)
 	if err != nil {
-		return nil, errors.Wrap(err, "MapFS")
-	}
-	dir, ok := ent.(*directory)
-	if !ok {
-		return nil, errors.Wrap(ErrDirIsFile, "MapFS")
+		return nil, errors.Wrapf(err, "MapFS: dir: `%s' name: `%s'", d, fname)
 	}
 
 	e, ok := dir.entries.Load(fname)
 	if !ok {
-		return nil, errors.Wrap(ErrFileNotExists, "MapFS")
+		return nil, errors.Wrapf(ErrFileNotExists, "MapFS: dir: `%s' name: `%s'", d, fname)
 	}
 
 	file, ok := e.(*file)
 	if !ok {
-		return nil, errors.Wrap(ErrFileIsDir, "MapFS")
+		return nil, errors.Wrapf(ErrFileIsDir, "MapFS: dir: `%s' name: `%s'", d, fname)
 	}
 
-	return &nsapi.MapFSResponse{Fsurl: file.fileservers[0], Inode: file.inode}, nil
+	return &nsapi.MapFSResponse{Fsurls: file.fileservers, Inode: file.inode}, nil
 }
 
 // ConnectFileServer is a request that fileservers use to connect to

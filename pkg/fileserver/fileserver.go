@@ -35,17 +35,22 @@ func initializeServerCatalog(path string) error {
 	if os.IsNotExist(err) {
 		log.Println("Server catalog not found. Creating one in " + path)
 		err := os.Mkdir(path, serverCatalogPerms)
+		if err != nil {
+			return errors.Wrap(err, "Can not create server catalog")
+		}
 		// Because of fucking umask
 		os.Chmod(path, serverCatalogPerms)
-		return errors.Wrap(err, "Can not create server catalog")
 	}
 
-	info, _ := dir.Stat()
+	info, err := dir.Stat()
+	if err != nil {
+		return err
+	}
 	isPermissionsInvalid := (info.Mode().Perm() != serverCatalogPerms)
 
 	if !info.IsDir() || isPermissionsInvalid {
-		return errors.New(path + "has invalid permissions or is not a " +
-			"directory")
+		fmt := "`%s' has invalid permissions or is not a directory"
+		return errors.Errorf(fmt, path)
 	}
 
 	return err

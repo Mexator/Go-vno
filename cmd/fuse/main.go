@@ -28,7 +28,12 @@ func main() {
 	nsurl := flag.Arg(0)
 	mountpoint := flag.Arg(1)
 
-	c, err := fuse.Mount(mountpoint, fuse.FSName("govno"), fuse.Subtype("dfs"))
+	fuseopts := []fuse.MountOption{
+		fuse.FSName("govno"),
+		fuse.Subtype("dfs"),
+		fuse.CongestionThreshold(1),
+	}
+	c, err := fuse.Mount(mountpoint, fuseopts...)
 	if err != nil {
 		log.Fatal(err)
 	}

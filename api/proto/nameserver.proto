@@ -8,6 +8,7 @@ service NameServer {
 	rpc ReadDirAll(ReadDirAllRequest) returns (ReadDirAllResponse) {}
 	rpc Create(CreateRequest) returns (CreateResponse) {}
 	rpc Remove(RemoveRequest) returns (RemoveResponse) {}
+	rpc Rename(RenameRequest) returns (RenameResponse) {}
 
 	// MapFS return url of fileserver that stores needed file together with
 	// inode of the file on that server  
@@ -23,7 +24,6 @@ service NameServer {
 message Node {
 	bool is_dir = 1;
 	string name = 2;
-	uint64 size = 3;
 }
 
 message ReadDirAllRequest {
@@ -47,13 +47,22 @@ message RemoveRequest {
 
 message RemoveResponse {}
 
+message RenameRequest {
+	string from_dir = 1;
+	string from_name = 2;
+	string to_dir = 3;
+	string to_name = 4;
+}
+
+message RenameResponse {}
+
 message MapFSRequest {
 	string path = 1;
 }
 
 message MapFSResponse {
-	string fsurl = 1;
-	string inode = 2;
+	string inode = 1;
+	repeated string fsurls = 2;
 }
 
 message ConnectRequest {}

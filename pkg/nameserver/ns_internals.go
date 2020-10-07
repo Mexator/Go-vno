@@ -34,9 +34,8 @@ type (
 	root struct{ dir directory }
 )
 
-func (d *directory) AsNode() *nsapi.Node {
-	return &nsapi.Node{IsDir: true, Name: d.name, Size: 4096}
-}
+func (d *directory) AsNode() *nsapi.Node { return &nsapi.Node{IsDir: true} }
+func (f *file) AsNode() *nsapi.Node      { return &nsapi.Node{IsDir: false} }
 
 func (d *directory) Remove(ctx context.Context) error {
 	var err error
@@ -48,10 +47,6 @@ func (d *directory) Remove(ctx context.Context) error {
 		return true
 	})
 	return err
-}
-
-func (f *file) AsNode() *nsapi.Node {
-	return &nsapi.Node{IsDir: false, Name: f.name}
 }
 
 func (f *file) Remove(ctx context.Context) error {
@@ -73,7 +68,12 @@ func (f *file) Remove(ctx context.Context) error {
 
 func (r *root) lookup(path string) (dirEntry, error) {
 	sep := string(os.PathSeparator)
-	parts := strings.Split(path, sep)[1:] // starts with /
+	parts := strings.Split(path, sep)
+
+	if parts[0] != "" { // starts with /
+		return nil, ErrDirNotExists
+	}
+	parts = parts[1:]
 
 	var d *directory = &r.dir
 	cur := sep
@@ -96,4 +96,16 @@ func (r *root) lookup(path string) (dirEntry, error) {
 	}
 
 	return d, nil
+}
+
+func (r *root) lookup_dir(path string) (*directory, error) {
+	ent, err := r.lookup(path)
+	if err != nil {
+		return nil, err
+	}
+	dir, ok := ent.(*directory)
+	if !ok {
+		return nil, ErrDirIsFile
+	}
+	return dir, nil
 }
