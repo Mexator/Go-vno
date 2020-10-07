@@ -28,9 +28,10 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	nsurl, storage := flag.Arg(0), flag.Arg(1)
 
 	s := utils.GrpcServer()
-	srv, err := fileserver.MakeFileServer(flag.Arg(1))
+	srv, err := fileserver.MakeFileServer(storage, nsurl)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,7 +42,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go attachToNS(flag.Arg(0))
+	go attachToNS(nsurl)
 	if err := s.Serve(listener); err != nil {
 		log.Fatal(err)
 	}
