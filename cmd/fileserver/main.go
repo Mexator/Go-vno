@@ -54,5 +54,5 @@ func attachToNS(serverAddress string) {
 		log.Fatal("Can not connect to name server")
 	}
 	client := nsapi.NewNameServerClient(conn)
-	client.ConnectFileServer(context.Background(), &nsapi.ConnectRequest{})
+	client.ConnectFileServer(context.Background(), &nsapi.ConnectRequest{Port: int32(*port)})
 }

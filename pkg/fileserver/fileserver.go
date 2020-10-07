@@ -42,6 +42,7 @@ func initializeServerCatalog(path string) error {
 		os.Chmod(path, serverCatalogPerms)
 	}
 
+	dir, err = os.Open(path)
 	info, err := dir.Stat()
 	if err != nil {
 		return err

@@ -65,5 +65,7 @@ message MapFSResponse {
 	repeated string fsurls = 2;
 }
 
-message ConnectRequest {}
+message ConnectRequest {
+int32 port = 1;
+}
 message ConnectResponse {}

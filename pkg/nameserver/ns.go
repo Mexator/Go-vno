@@ -6,6 +6,8 @@ import (
 	"log"
 	"math/rand"
 	"path"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -238,7 +240,7 @@ func (g *GRPCServer) MapFS(
 // nameserver. After connection name server uses them to store files
 func (g *GRPCServer) ConnectFileServer(
 	ctx context.Context,
-	_ *nsapi.ConnectRequest,
+	req *nsapi.ConnectRequest,
 ) (*nsapi.ConnectResponse, error) {
 	// Obtain sender address from context
 	peer, ok := peer.FromContext(ctx)
@@ -246,7 +248,9 @@ func (g *GRPCServer) ConnectFileServer(
 		return nil, ErrNoPeerInfo
 	}
 
-	addr := peer.Addr.String()
+	// Fuck IPv6
+	addr := strings.Split(peer.Addr.String(), ":")[0]
+	addr = addr + ":" + strconv.Itoa(int(req.Port))
 
 	_, ok = g.servers[addr]
 	if ok {
