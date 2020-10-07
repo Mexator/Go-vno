@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"os"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/peer"
 
 	fsapi "github.com/Mexator/Go-vno/pkg/api/fileserver"
 	nsapi "github.com/Mexator/Go-vno/pkg/api/nameserver"
@@ -22,26 +21,9 @@ import (
 
 type (
 	GRPCServer struct {
-		servers      []string
+		servers      map[string]struct{}
 		replicatecnt uint
 		root         root
-	}
-	root struct{ dir directory }
-
-	dirEntry interface {
-		AsNode() *nsapi.Node
-		Remove(context.Context) error
-	}
-
-	directory struct {
-		name    string
-		entries sync.Map // map[string]dirEntry
-	}
-	file struct {
-		name string
-
-		inode       string
-		fileservers []string
 	}
 
 	NameServerError struct {
@@ -53,13 +35,20 @@ type (
 var (
 	grpcopts = []grpc.DialOption{grpc.WithInsecure()}
 
+	ErrNoFileSevers = fmt.Errorf("Needed number of fileservers is not " +
+		"available",
+	)
+
 	ErrFileExists    = fmt.Errorf("File already exists")
 	ErrFileNotExists = fmt.Errorf("File does not exists")
 	ErrDirNotExists  = fmt.Errorf("Directory does not exists")
-	ErrDirFile       = fmt.Errorf("Directory is actually a file")
-	ErrFileDir       = fmt.Errorf("File is actually a directory")
+	ErrDirIsFile     = fmt.Errorf("Directory is actually a file")
+	ErrFileIsDir     = fmt.Errorf("File is actually a directory")
+
+	ErrNoPeerInfo = fmt.Errorf("Cannot obtain name server address from context")
 )
 
+// Generates unique IDs for file
 func getInode() string {
 	id, err := uuid.NewUUID()
 	if err != nil {
@@ -68,95 +57,29 @@ func getInode() string {
 	return id.String()
 }
 
-func (d *directory) AsNode() *nsapi.Node {
-	return &nsapi.Node{IsDir: true, Name: d.name, Size: 4096}
+// NewServer creates new NameServer
+func NewServer() nsapi.NameServerServer {
+	serversset := make(map[string]struct{})
+	return &GRPCServer{servers: serversset, replicatecnt: 2}
 }
 
-func (d *directory) Remove(ctx context.Context) error {
-	var err error
-	d.entries.Range(func(k, nodeint interface{}) bool {
-		if e := nodeint.(dirEntry).Remove(ctx); e != nil {
-			err = e
-		}
-		d.entries.Delete(k)
-		return true
-	})
-	return err
-}
-
-func (f *file) AsNode() *nsapi.Node {
-	return &nsapi.Node{IsDir: false, Name: f.name}
-}
-
-func (f *file) Remove(ctx context.Context) error {
-	var err error
-	for _, fsurl := range f.fileservers {
-		conn, e := cache.GrpcDial(fsurl, grpcopts...)
-		if err != nil {
-			err = e
-		}
-		fs := fsapi.NewFileServerClient(conn)
-
-		_, e = fs.Remove(ctx, &fsapi.RemoveRequest{Inode: f.inode})
-		if err != nil {
-			err = e
-		}
-	}
-	return err
-}
-
-func NewServer(servers []string) nsapi.NameServerServer {
-	var serversset map[string]struct{}
-
-	for _, s := range servers {
-		serversset[s] = struct{}{}
+func (g *GRPCServer) pickServers(n int) ([]string, error) {
+	if len(g.servers) < n {
+		return nil, ErrNoFileSevers
 	}
 
-	var uniqservers []string
-
-	for s := range serversset {
-		uniqservers = append(uniqservers, s)
-	}
-
-	return &GRPCServer{servers: uniqservers, replicatecnt: 2}
-}
-
-func (r *root) lookup(path string) (dirEntry, error) {
-	sep := string(os.PathSeparator)
-	parts := strings.Split(path, sep)[1:] // starts with /
-
-	var d *directory = &r.dir
-	cur := sep
-
-	for _, p := range parts {
-		if p == "" {
-			return d, nil
-		}
-
-		ent, ok := d.entries.Load(p)
-		cur = cur + sep + p
-		if !ok {
-			return nil, ErrDirNotExists
-		}
-
-		d, ok = ent.(*directory)
-		if !ok {
-			return nil, ErrDirFile
-		}
-	}
-
-	return d, nil
-}
-
-func (g *GRPCServer) pickServers(n int) []string {
 	seed := sync.Once{}
 	seed.Do(func() {
 		rand.Seed(time.Now().Unix())
 	})
 
-	a := g.servers
-	rand.Shuffle(n, func(i, j int) { a[i], a[j] = a[j], a[i] })
-	return a[:n]
+	keys := make([]string, 0, len(g.servers))
+	for k := range g.servers {
+		keys = append(keys, k)
+	}
+
+	rand.Shuffle(n, func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
+	return keys[:n], nil
 }
 
 func (g *GRPCServer) ReadDirAll(
@@ -169,7 +92,7 @@ func (g *GRPCServer) ReadDirAll(
 	}
 	d, ok := ent.(*directory)
 	if !ok {
-		return nil, errors.Wrap(ErrDirFile, "Lookup")
+		return nil, errors.Wrap(ErrDirIsFile, "Lookup")
 	}
 	nodes := []*nsapi.Node{}
 	d.entries.Range(func(_, value interface{}) bool {
@@ -194,7 +117,7 @@ func (g *GRPCServer) Create(
 
 	dir, ok := ent.(*directory)
 	if !ok {
-		return nil, errors.Wrap(ErrDirFile, "Create")
+		return nil, errors.Wrap(ErrDirIsFile, "Create")
 	}
 
 	_, ok = dir.entries.Load(node)
@@ -208,7 +131,10 @@ func (g *GRPCServer) Create(
 		return &nsapi.CreateResponse{}, nil
 	}
 
-	fileservers := g.pickServers(int(g.replicatecnt))
+	fileservers, err := g.pickServers(int(g.replicatecnt))
+	if err != nil {
+		return nil, err
+	}
 	inode := getInode()
 
 	// Falsestarting servers in order to get some errors beforehand
@@ -227,6 +153,7 @@ func (g *GRPCServer) Create(
 		f := fsapi.NewFileServerClient(conn)
 		_, err := f.Create(ctx, &fsapi.CreateRequest{Inode: inode})
 		if err != nil {
+			log.Print(err)
 			goto cleanup
 		}
 	}
@@ -267,7 +194,8 @@ func (g *GRPCServer) Remove(
 	return &nsapi.RemoveResponse{}, nil
 }
 
-// MapFS maps
+// MapFS return url of fileserver that stores needed file together with
+// inode of the file on that server
 func (g *GRPCServer) MapFS(
 	ctx context.Context,
 	mreq *nsapi.MapFSRequest,
@@ -279,7 +207,7 @@ func (g *GRPCServer) MapFS(
 	}
 	dir, ok := ent.(*directory)
 	if !ok {
-		return nil, errors.Wrap(ErrDirFile, "MapFS")
+		return nil, errors.Wrap(ErrDirIsFile, "MapFS")
 	}
 
 	e, ok := dir.entries.Load(fname)
@@ -289,8 +217,43 @@ func (g *GRPCServer) MapFS(
 
 	file, ok := e.(*file)
 	if !ok {
-		return nil, errors.Wrap(ErrFileDir, "MapFS")
+		return nil, errors.Wrap(ErrFileIsDir, "MapFS")
 	}
 
 	return &nsapi.MapFSResponse{Fsurl: file.fileservers[0], Inode: file.inode}, nil
+}
+
+// ConnectFileServer is a request that fileservers use to connect to
+// nameserver. After connection name server uses them to store files
+func (g *GRPCServer) ConnectFileServer(
+	ctx context.Context,
+	_ *nsapi.ConnectRequest,
+) (*nsapi.ConnectResponse, error) {
+	// Obtain sender address from context
+	peer, ok := peer.FromContext(ctx)
+	if !ok {
+		return nil, ErrNoPeerInfo
+	}
+
+	addr := peer.Addr.String()
+
+	_, ok = g.servers[addr]
+	if ok {
+		return &nsapi.ConnectResponse{}, nil
+	}
+
+	// Check if sender is a working file server
+	conn, err := cache.GrpcDial(addr, grpcopts...)
+	if err != nil {
+		return nil, err
+	}
+
+	fileserver := fsapi.NewFileServerClient(conn)
+	_, err = fileserver.ReportDiskSpace(ctx, &fsapi.Empty{})
+	if err != nil {
+		return nil, err
+	}
+
+	g.servers[addr] = struct{}{}
+	return &nsapi.ConnectResponse{}, nil
 }

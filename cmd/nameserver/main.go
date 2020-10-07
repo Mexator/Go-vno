@@ -26,7 +26,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	srv := ns.NewServer(fileservers)
+	srv := ns.NewServer()
 	nsapi.RegisterNameServerServer(s, srv)
 
 	log.Printf("Server is listening on %s:%d", *host, *port)

@@ -9,9 +9,15 @@ service NameServer {
 	rpc Create(CreateRequest) returns (CreateResponse) {}
 	rpc Remove(RemoveRequest) returns (RemoveResponse) {}
 
-	// Return url of fileserver that stores needed file together with
+	// MapFS return url of fileserver that stores needed file together with
 	// inode of the file on that server  
 	rpc MapFS(MapFSRequest) returns (MapFSResponse) {}
+
+	// Only for file servers
+
+	// ConnectFileServer is a request that fileservers use to connect to
+	// nameserver. After connection name server uses them to store files
+	rpc ConnectFileServer(ConnectRequest) returns (ConnectResponse){}
 }
 
 message Node {
@@ -49,3 +55,6 @@ message MapFSResponse {
 	string fsurl = 1;
 	string inode = 2;
 }
+
+message ConnectRequest {}
+message ConnectResponse {}
