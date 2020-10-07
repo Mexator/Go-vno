@@ -106,7 +106,7 @@ func (f *file) Remove(ctx context.Context) error {
 }
 
 func NewServer(servers []string) nsapi.NameServerServer {
-	var serversset map[string]struct{}
+	serversset := make(map[string]struct{})
 
 	for _, s := range servers {
 		serversset[s] = struct{}{}
@@ -227,6 +227,7 @@ func (g *GRPCServer) Create(
 		f := fsapi.NewFileServerClient(conn)
 		_, err := f.Create(ctx, &fsapi.CreateRequest{Inode: inode})
 		if err != nil {
+			log.Print(err)
 			goto cleanup
 		}
 	}
