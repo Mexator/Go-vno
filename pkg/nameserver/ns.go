@@ -30,12 +30,10 @@ type (
 var (
 	grpcopts = []grpc.DialOption{grpc.WithInsecure()}
 
-	ErrDirFile        = fmt.Errorf("Directory is actually a file")
 	ErrDirIsFile      = fmt.Errorf("Directory is actually a file")
 	ErrDirNotExists   = fmt.Errorf("Directory does not exists")
 	ErrEntryExists    = fmt.Errorf("Entry already exists")
 	ErrEntryNotExists = fmt.Errorf("Entry does not exists")
-	ErrFileDir        = fmt.Errorf("File is actually a directory")
 	ErrFileExists     = fmt.Errorf("File already exists")
 	ErrFileIsDir      = fmt.Errorf("File is actually a directory")
 	ErrFileNotExists  = fmt.Errorf("File does not exists")
@@ -230,7 +228,7 @@ func (g *GRPCServer) MapFS(
 
 	file, ok := e.(*file)
 	if !ok {
-		return nil, errors.Wrapf(ErrFileDir, "MapFS: dir: `%s' name: `%s'", d, fname)
+		return nil, errors.Wrapf(ErrFileIsDir, "MapFS: dir: `%s' name: `%s'", d, fname)
 	}
 
 	return &nsapi.MapFSResponse{Fsurls: file.fileservers, Inode: file.inode}, nil

@@ -91,7 +91,7 @@ func (r *root) lookup(path string) (dirEntry, error) {
 
 		d, ok = ent.(*directory)
 		if !ok {
-			return nil, ErrDirFile
+			return nil, ErrDirIsFile
 		}
 	}
 
@@ -105,7 +105,7 @@ func (r *root) lookup_dir(path string) (*directory, error) {
 	}
 	dir, ok := ent.(*directory)
 	if !ok {
-		return nil, ErrDirFile
+		return nil, ErrDirIsFile
 	}
 	return dir, nil
 }
