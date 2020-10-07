@@ -2,4 +2,4 @@
 FROM scratch
 COPY docker/fileserver/data build/fileserver /
 ENTRYPOINT ["/fileserver"]
-CMD ["/data"]
+CMD ["nameserver","/data"]

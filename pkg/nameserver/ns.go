@@ -62,7 +62,12 @@ func NewServer() nsapi.NameServerServer {
 }
 
 func (g *GRPCServer) pickServers(n int) ([]string, error) {
-	if len(g.servers) == 0 {
+	// Avoid IndexOutOfBounds
+	if len(g.servers) < n {
+		n = len(g.servers)
+	}
+
+	if n <= 0 {
 		return nil, ErrNoFileSevers
 	}
 
@@ -74,11 +79,6 @@ func (g *GRPCServer) pickServers(n int) ([]string, error) {
 	keys := make([]string, 0, len(g.servers))
 	for k := range g.servers {
 		keys = append(keys, k)
-	}
-
-	// Avoid IndexOutOfBounds
-	if n < len(g.servers) {
-		n = len(g.servers)
 	}
 
 	rand.Shuffle(n, func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
