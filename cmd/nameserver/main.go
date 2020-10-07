@@ -8,7 +8,7 @@ import (
 
 	nsapi "github.com/Mexator/Go-vno/pkg/api/nameserver"
 	ns "github.com/Mexator/Go-vno/pkg/nameserver"
-	"google.golang.org/grpc"
+	"github.com/Mexator/Go-vno/pkg/utils"
 )
 
 var (
@@ -19,13 +19,7 @@ var (
 func main() {
 	flag.Parse()
 
-	var fileservers []string
-
-	for i := 0; i < flag.NArg(); i++ {
-		fileservers = append(fileservers, flag.Arg(i))
-	}
-
-	s := grpc.NewServer()
+	s := utils.GrpcServer()
 	srv := ns.NewServer()
 	nsapi.RegisterNameServerServer(s, srv)
 

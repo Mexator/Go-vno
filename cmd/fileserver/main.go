@@ -7,10 +7,10 @@ import (
 	"log"
 	"net"
 
-	"github.com/Mexator/Go-vno/pkg/fileserver"
-
 	api "github.com/Mexator/Go-vno/pkg/api/fileserver"
 	nsapi "github.com/Mexator/Go-vno/pkg/api/nameserver"
+	"github.com/Mexator/Go-vno/pkg/fileserver"
+	"github.com/Mexator/Go-vno/pkg/utils"
 
 	"google.golang.org/grpc"
 )
@@ -29,7 +29,7 @@ func main() {
 	}
 	flag.Parse()
 
-	s := grpc.NewServer()
+	s := utils.GrpcServer()
 	srv, err := fileserver.MakeFileServer(flag.Arg(1))
 	if err != nil {
 		log.Fatal(err)

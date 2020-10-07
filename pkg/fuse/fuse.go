@@ -2,11 +2,9 @@ package fuse
 
 import (
 	"context"
-	"hash/fnv"
-	"log"
 	"os"
 	"path"
-	"path/filepath"
+	"sync"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -27,13 +25,19 @@ type (
 	}
 
 	Dir struct {
-		path string
+		dir  *Dir
+		name string
+		conn nsapi.NameServerClient
+		sync.Map
+	}
+	File struct {
+		dir  *Dir
+		name string
 		conn nsapi.NameServerClient
 	}
-
-	File struct {
-		path string
-		conn nsapi.NameServerClient
+	Node interface {
+		rename(name string)
+		changedir(dir *Dir)
 	}
 )
 
@@ -46,27 +50,31 @@ func (f *FS) Root() (fs.Node, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed connect to name server")
 	}
-	return &Dir{path: "/", conn: nsapi.NewNameServerClient(conn)}, nil
+	return &Dir{conn: nsapi.NewNameServerClient(conn)}, nil
 }
 
-func getInode(fname string) uint64 {
-	h := fnv.New64()
-	_, err := h.Write([]byte(fname))
-	if err != nil {
-		log.Fatal(err)
+func (d *Dir) getPath() string {
+	if d.dir == nil {
+		return string(os.PathSeparator)
+	} else {
+		return path.Join(d.dir.getPath(), d.name)
 	}
-	return h.Sum64()
 }
+
+func (f *File) getPath() string    { return path.Join(f.dir.getPath(), f.name) }
+func (f *File) rename(name string) { f.name = name }
+func (d *Dir) rename(name string)  { d.name = name }
+func (f *File) changedir(dir *Dir) { f.dir = dir }
+func (d *Dir) changedir(dir *Dir)  { d.dir = dir }
 
 func (d *Dir) Attr(ctx context.Context, a *fuse.Attr) error {
-	a.Inode = getInode(d.path)
 	a.Mode = os.ModeDir | 0o555
 	a.Size = 4096 // Why not lol
 	return nil
 }
 
 func (d *Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
-	resp, err := d.conn.ReadDirAll(ctx, &nsapi.ReadDirAllRequest{Path: d.path})
+	resp, err := d.conn.ReadDirAll(ctx, &nsapi.ReadDirAllRequest{Path: d.getPath()})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed lookup in name server")
 	}
@@ -76,19 +84,23 @@ func (d *Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 			continue
 		}
 
-		path := filepath.Join(d.path, n.Name)
+		var node fs.Node
+
 		if n.IsDir {
-			return &Dir{path: path, conn: d.conn}, nil
+			node = &Dir{dir: d, name: name, conn: d.conn}
 		} else {
-			return &File{path: path, conn: d.conn}, nil
+			node = &File{dir: d, name: name, conn: d.conn}
 		}
+
+		d.Store(name, node)
+		return node, nil
 	}
 
 	return nil, syscall.ENOENT
 }
 
 func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
-	resp, err := d.conn.ReadDirAll(ctx, &nsapi.ReadDirAllRequest{Path: d.path})
+	resp, err := d.conn.ReadDirAll(ctx, &nsapi.ReadDirAllRequest{Path: d.getPath()})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed lookup in name server")
 	}
@@ -96,10 +108,7 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	ret := []fuse.Dirent{}
 
 	for _, n := range resp.Nodes {
-		dirent := fuse.Dirent{
-			Inode: getInode(filepath.Join(d.path, n.Name)),
-			Name:  n.Name,
-		}
+		dirent := fuse.Dirent{Name: n.Name}
 
 		if n.IsDir {
 			dirent.Type = fuse.DT_Dir
@@ -113,24 +122,37 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	return ret, nil
 }
 
-func (f *File) getSize(ctx context.Context) (uint64, error) {
-	resp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.path})
-	if err != nil {
-		return 0, errors.Wrap(err, "Failed MapFS")
-	}
-
-	conn, err := cache.GrpcDial(resp.Fsurl, grpcopts...)
+func (f *File) fsGetSize(ctx context.Context, fsurl, inode string) (uint64, error) {
+	conn, err := cache.GrpcDial(fsurl, grpcopts...)
 	if err != nil {
 		return 0, errors.Wrap(err, "Failed to connect to fileserver")
 	}
 	cl := fsapi.NewFileServerClient(conn)
 
-	szresp, err := cl.Size(ctx, &fsapi.SizeRequest{Inode: resp.Inode})
+	szresp, err := cl.Size(ctx, &fsapi.SizeRequest{Inode: inode})
 	if err != nil {
 		return 0, errors.Wrap(err, "Failed to retrieve size")
 	}
 
 	return szresp.Size, nil
+}
+
+func (f *File) getSize(ctx context.Context) (uint64, error) {
+	resp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.getPath()})
+	if err != nil {
+		return 0, errors.Wrap(err, "Failed MapFS")
+	}
+
+	var sz uint64
+
+	for _, url := range resp.Fsurls {
+		sz, err = f.fsGetSize(ctx, url, resp.Inode)
+		if err == nil {
+			return sz, nil
+		}
+	}
+
+	return 0, err
 }
 
 func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
@@ -139,33 +161,24 @@ func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 		return errors.Wrap(err, "Attr:")
 	}
 
-	a.Inode = getInode(f.path)
 	a.Mode = 0o777 // No mode management lol
 	a.Size = sz
 	return nil
 }
 
-func (f *File) ReadAll(ctx context.Context) ([]byte, error) {
-	resp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.path})
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to retrieve fileserver from nameserver")
-	}
-	conn, err := cache.GrpcDial(resp.Fsurl, grpcopts...)
+func (f *File) Read(ctx context.Context, fsurl, inode string) ([]byte, error) {
+	conn, err := cache.GrpcDial(fsurl, grpcopts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to connect to fileserver")
 	}
 	cl := fsapi.NewFileServerClient(conn)
 
-	szresp, err := cl.Size(ctx, &fsapi.SizeRequest{Inode: resp.Inode})
+	szresp, err := cl.Size(ctx, &fsapi.SizeRequest{Inode: inode})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to get size")
 	}
 
-	rresp, err := cl.Read(ctx, &fsapi.ReadRequest{
-		Inode:  resp.Inode,
-		Offset: 0,
-		Size:   szresp.Size,
-	})
+	rresp, err := cl.Read(ctx, &fsapi.ReadRequest{Inode: inode, Offset: 0, Size: szresp.Size})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to read from fileserver")
 	}
@@ -173,31 +186,54 @@ func (f *File) ReadAll(ctx context.Context) ([]byte, error) {
 	return rresp.Content, nil
 }
 
+func (f *File) ReadAll(ctx context.Context) ([]byte, error) {
+	resp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.getPath()})
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to retrieve fileserver from nameserver")
+	}
+
+	var cont []byte
+
+	for _, url := range resp.Fsurls {
+		cont, err = f.Read(ctx, url, resp.Inode)
+		if err == nil {
+			return cont, nil
+		}
+	}
+
+	return nil, err
+}
+
 func (f *File) Write(
 	ctx context.Context,
 	req *fuse.WriteRequest,
 	resp *fuse.WriteResponse,
 ) error {
-	mresp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.path})
+	mresp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.getPath()})
+	resp.Size = 0
 	if err != nil {
-		resp.Size = 0
 		return errors.Wrap(err, "Failed to retrieve fileserver from nameserver")
 	}
-	conn, err := cache.GrpcDial(mresp.Fsurl, grpcopts...)
-	if err != nil {
-		resp.Size = 0
-		return errors.Wrap(err, "Failed to connect fileserver")
-	}
-	cl := fsapi.NewFileServerClient(conn)
 
-	_, err = cl.Write(ctx, &fsapi.WriteRequest{
-		Inode:   mresp.Inode,
-		Offset:  uint64(req.Offset),
-		Content: req.Data,
-	})
-	if err != nil {
-		resp.Size = 0
-		return errors.Wrap(err, "Failed to write to fileserver")
+	for _, fsurl := range mresp.Fsurls {
+		_, err = cache.GrpcDial(fsurl, grpcopts...)
+		if err != nil {
+			return errors.Wrap(err, "Failed to connect fileserver")
+		}
+	}
+
+	for i := 0; i < len(mresp.Fsurls); i++ {
+		conn, _ := cache.GrpcDial(mresp.Fsurls[i], grpcopts...)
+		cl := fsapi.NewFileServerClient(conn)
+
+		_, err = cl.Write(ctx, &fsapi.WriteRequest{
+			Inode:   mresp.Inode,
+			Offset:  uint64(req.Offset),
+			Content: req.Data,
+		})
+		if err != nil {
+			return errors.Wrap(err, "Failed to write to fileserver")
+		}
 	}
 
 	resp.Size = len(req.Data)
@@ -205,7 +241,7 @@ func (f *File) Write(
 }
 
 func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
-	rreq := &nsapi.RemoveRequest{Path: path.Join(d.path, req.Name)}
+	rreq := &nsapi.RemoveRequest{Path: path.Join(d.getPath(), req.Name)}
 	_, err := d.conn.Remove(ctx, rreq)
 	if err != nil {
 		return errors.Wrap(err, "Failed to remove entry")
@@ -219,7 +255,7 @@ func (d *Dir) Create(
 	resp *fuse.CreateResponse,
 ) (fs.Node, fs.Handle, error) {
 	creq := &nsapi.CreateRequest{
-		Path:  path.Join(d.path, req.Name),
+		Path:  path.Join(d.getPath(), req.Name),
 		IsDir: req.Mode.IsDir(),
 	}
 	_, err := d.conn.Create(ctx, creq)
@@ -237,7 +273,7 @@ func (d *Dir) Create(
 
 func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error) {
 	creq := &nsapi.CreateRequest{
-		Path:  path.Join(d.path, req.Name),
+		Path:  path.Join(d.getPath(), req.Name),
 		IsDir: true,
 	}
 	_, err := d.conn.Create(ctx, creq)
@@ -251,4 +287,27 @@ func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error
 	}
 
 	return node, err
+}
+
+func (from *Dir) Rename(ctx context.Context, req *fuse.RenameRequest, to_node fs.Node) error {
+	to := to_node.(*Dir)
+	rreq := &nsapi.RenameRequest{
+		FromDir:  from.getPath(),
+		FromName: req.OldName,
+		ToDir:    to.getPath(),
+		ToName:   req.NewName,
+	}
+	_, err := from.conn.Rename(ctx, rreq)
+	if err != nil {
+		return errors.Wrap(err, "Failed to rename:")
+	}
+
+	v, l := from.Map.LoadAndDelete(req.OldName)
+	if l {
+		v.(Node).rename(req.NewName)
+		v.(Node).changedir(to)
+		to.Map.Store(req.NewName, v)
+	}
+
+	return nil
 }
