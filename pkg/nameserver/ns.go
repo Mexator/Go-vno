@@ -35,7 +35,9 @@ type (
 var (
 	grpcopts = []grpc.DialOption{grpc.WithInsecure()}
 
-	ErrNoFileSevers = fmt.Errorf("No fileservers available")
+	ErrNoFileSevers = fmt.Errorf("Needed number of fileservers is not " +
+		"available",
+	)
 
 	ErrFileExists    = fmt.Errorf("File already exists")
 	ErrFileNotExists = fmt.Errorf("File does not exists")
@@ -62,12 +64,7 @@ func NewServer() nsapi.NameServerServer {
 }
 
 func (g *GRPCServer) pickServers(n int) ([]string, error) {
-	// Avoid IndexOutOfBounds
 	if len(g.servers) < n {
-		n = len(g.servers)
-	}
-
-	if n <= 0 {
 		return nil, ErrNoFileSevers
 	}
 
