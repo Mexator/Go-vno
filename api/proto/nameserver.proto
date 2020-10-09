@@ -66,6 +66,6 @@ message MapFSResponse {
 }
 
 message ConnectRequest {
-int32 port = 1;
+	int32 port = 1;
 }
 message ConnectResponse {}
