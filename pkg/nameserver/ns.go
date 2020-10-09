@@ -248,9 +248,14 @@ func (g *GRPCServer) ConnectFileServer(
 		return nil, ErrNoPeerInfo
 	}
 
-	// Fuck IPv6
-	addr := strings.Split(peer.Addr.String(), ":")[0]
-	addr = addr + ":" + strconv.Itoa(int(req.Port))
+	fields := strings.Split(peer.Addr.String(), ":")
+	fields = fields[:len(fields)-1]
+
+	var addr string
+	for _, part := range fields {
+		addr += part + ":"
+	}
+	addr += strconv.Itoa(int(req.Port))
 
 	_, ok = g.servers[addr]
 	if ok {
