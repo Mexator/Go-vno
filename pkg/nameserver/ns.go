@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
@@ -59,7 +59,7 @@ func NewServer() nsapi.NameServerServer {
 
 func (g *GRPCServer) pickServers(n int) ([]string, error) {
 	if len(g.servers) < n {
-		return nil, ErrNoFileSevers
+		return nil, errors.Wrapf(ErrNoFileSevers, "servers %v", g.servers)
 	}
 
 	seed := sync.Once{}
@@ -170,10 +170,9 @@ func (g *GRPCServer) Rename(
 		return nil, errors.Wrapf(err, "Rename: Failed to find directory `%s'")
 	}
 
-	_, ok := to.entries.Load(rreq.ToName)
+	e, ok := to.entries.Load(rreq.ToName)
 	if ok {
-		fmt := "Rename: Entry `%s' in `%s' already exists"
-		return nil, errors.Wrapf(ErrEntryExists, fmt, rreq.ToName, rreq.ToDir)
+		e.(dirEntry).Remove(ctx)
 	}
 
 	ent_int, ok := from.entries.LoadAndDelete(rreq.FromName)
@@ -183,7 +182,6 @@ func (g *GRPCServer) Rename(
 	}
 
 	to.entries.Store(rreq.ToName, ent_int.(dirEntry))
-	log.Println("Ok Rename", rreq)
 
 	return &nsapi.RenameResponse{}, nil
 }
@@ -247,12 +245,15 @@ func (g *GRPCServer) ConnectFileServer(
 		return nil, ErrNoPeerInfo
 	}
 
-	fullAddr := peer.Addr.String()
-	addr := fullAddr[:strings.LastIndex(fullAddr, ":")]
-	addr = fmt.Sprintf("%s:%d", addr, req.Port)
-	log.Printf("Connect request from %s", addr)
+	host, _, err := net.SplitHostPort(peer.Addr.String())
+	log.Printf("Connect request from %s", host)
 
-	_, ok = g.servers[addr]
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to split host and port")
+	}
+
+	addr := fmt.Sprintf("%s:%d", host, req.Port)
+	_, ok = g.servers[host]
 	if ok {
 		return &nsapi.ConnectResponse{}, nil
 	}

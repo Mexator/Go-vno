@@ -1,3 +1,6 @@
+MOUNTDIR=mnt
+NFILESERVERS=3
+
 all: generate fileserver nameserver build/client
 
 generate: pkg/api/nameserver/nameserver.pb.go pkg/api/fileserver/fileserver.pb.go
@@ -21,12 +24,15 @@ nameserver: build/nameserver
 build/client: cmd/fuse/* pkg/fuse/*
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o build/client ./cmd/fuse
 
-MOUNTDIR=mnt
 local_run: generate fileserver nameserver build/client
-	docker-compose -f docker/docker-compose.yml up -d --scale fileserver=3
-	if [ ! -d $(MOUNTDIR) ]; then \
-		mkdir $(MOUNTDIR);\
-	fi
+	docker-compose -f docker/docker-compose.yml down || true
+	docker-compose -f docker/docker-compose.yml up -d --scale fileserver=$(NFILESERVERS)
+	while ! docker-compose -f docker/docker-compose.yml logs | grep -q '"grpc.method": "ConnectFileServer"' ; do :; done
+	[ $$(docker-compose -f docker/docker-compose.yml logs | grep '"grpc.method": "ConnectFileServer"' | grep OK | wc -l) = $(NFILESERVERS) ]
+	mkdir -p $(MOUNTDIR)
 	./build/client -fuse.debug :3000 mnt
+
+local_logs:
+	sudo docker-compose -f docker/docker-compose.yml logs
 
 .PHONY: generate fileserver nameserver all local_run

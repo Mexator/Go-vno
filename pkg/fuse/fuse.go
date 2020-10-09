@@ -7,11 +7,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/pkg/errors"
-
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	_ "bazil.org/fuse/fs/fstestutil"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 
 	fsapi "github.com/Mexator/Go-vno/pkg/api/fileserver"
@@ -67,8 +66,20 @@ func (d *Dir) rename(name string)  { d.name = name }
 func (f *File) changedir(dir *Dir) { f.dir = dir }
 func (d *Dir) changedir(dir *Dir)  { d.dir = dir }
 
+func (*File) Getxattr(
+	context.Context, *fuse.GetxattrRequest, *fuse.GetxattrResponse,
+) error {
+	return fuse.ErrNoXattr
+}
+
+func (*Dir) Getxattr(
+	context.Context, *fuse.GetxattrRequest, *fuse.GetxattrResponse,
+) error {
+	return fuse.ErrNoXattr
+}
+
 func (d *Dir) Attr(ctx context.Context, a *fuse.Attr) error {
-	a.Mode = os.ModeDir | 0o555
+	a.Mode = os.ModeDir | 0o755
 	a.Size = 4096 // Why not lol
 	return nil
 }
@@ -163,45 +174,58 @@ func (f *File) Attr(ctx context.Context, a *fuse.Attr) error {
 
 	a.Mode = 0o777 // No mode management lol
 	a.Size = sz
+	a.BlockSize = 2 * 1024 * 1024
 	return nil
 }
 
-func (f *File) Read(ctx context.Context, fsurl, inode string) ([]byte, error) {
+func (f *File) read_from(
+	ctx context.Context,
+	req *fuse.ReadRequest,
+	resp *fuse.ReadResponse,
+	fsurl, inode string,
+) error {
 	conn, err := cache.GrpcDial(fsurl, grpcopts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to connect to fileserver")
+		return errors.Wrap(err, "Failed to connect to fileserver")
 	}
 	cl := fsapi.NewFileServerClient(conn)
 
-	szresp, err := cl.Size(ctx, &fsapi.SizeRequest{Inode: inode})
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get size")
+	if req.Offset < 0 || req.Size < 0 {
+		return errors.New("Offset and size should be positive")
 	}
 
-	rresp, err := cl.Read(ctx, &fsapi.ReadRequest{Inode: inode, Offset: 0, Size: szresp.Size})
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to read from fileserver")
+	rreq := &fsapi.ReadRequest{
+		Inode:  inode,
+		Offset: uint64(req.Offset),
+		Size:   uint64(req.Size),
 	}
-
-	return rresp.Content, nil
+	rresp, err := cl.Read(ctx, rreq)
+	if err != nil {
+		return errors.Wrap(err, "Failed to read from fileserver")
+	}
+	resp.Data = rresp.Content
+	return nil
 }
 
-func (f *File) ReadAll(ctx context.Context) ([]byte, error) {
-	resp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.getPath()})
+func (f *File) Read(
+	ctx context.Context,
+	req *fuse.ReadRequest,
+	resp *fuse.ReadResponse,
+) error {
+	mresp, err := f.conn.MapFS(ctx, &nsapi.MapFSRequest{Path: f.getPath()})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to retrieve fileserver from nameserver")
+		return errors.Wrap(err, "Failed to retrieve fileserver from nameserver")
 	}
 
-	var cont []byte
-
-	for _, url := range resp.Fsurls {
-		cont, err = f.Read(ctx, url, resp.Inode)
+	for _, url := range mresp.Fsurls {
+		err = f.read_from(ctx, req, resp, url, mresp.Inode)
 		if err == nil {
-			return cont, nil
+			return nil
 		}
 	}
 
-	return nil, err
+	return err
+
 }
 
 func (f *File) Write(
@@ -287,6 +311,10 @@ func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error
 	}
 
 	return node, err
+}
+
+func (*File) Fsync(context.Context, *fuse.FsyncRequest) error {
+	return nil
 }
 
 func (from *Dir) Rename(ctx context.Context, req *fuse.RenameRequest, to_node fs.Node) error {

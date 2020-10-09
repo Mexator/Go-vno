@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -21,7 +22,7 @@ type FileServer struct {
 	// Absolute path to folder
 	storagePath string
 	// For authentication
-	nsUrl      string
+	nsIps      []string
 	storageDir *os.File
 }
 
@@ -65,30 +66,42 @@ func initializeServerCatalog(path string) error {
 	return err
 }
 
-/*
- * MakeFileServer creates FileServer reading its configuration from
- * `config.json` file.
- */
-func MakeFileServer(storagePath, nsUrl string) (FileServer, error) {
+func MakeFileServer(storagePath, nsUrl string) (api.FileServerServer, error) {
 	err := initializeServerCatalog(storagePath)
 	if err != nil {
-		return FileServer{}, errors.Wrap(err,
-			"Server catalog can not be initialized")
+		return nil, errors.Wrap(err, "Server catalog can not be initialized")
 	}
 
 	file, _ := os.Open(storagePath)
 	nsUrl = nsUrl[:strings.LastIndex(nsUrl, ":")]
-	return FileServer{storagePath, nsUrl, file}, nil
+	nsIps, err := net.LookupHost(nsUrl)
+	if err != nil {
+		return nil, err
+	}
+	return &FileServer{storagePath, nsIps, file}, nil
 }
 
-func (server *FileServer) isNS(ctx context.Context) bool {
+func (server *FileServer) assertNS(ctx context.Context) error {
 	peer, ok := peer.FromContext(ctx)
 	if !ok {
-		return false
+		return errors.New("Failed retrieve nameserver ip from context")
 	}
-	addr := peer.Addr.String()
-	addr = addr[:strings.LastIndex(addr, ":")]
-	return addr == server.nsUrl
+	host, _, err := net.SplitHostPort(peer.Addr.String())
+	if err != nil {
+		return errors.Wrap(err, "Failed to split host and port")
+	}
+
+	addrs, err := net.LookupHost(host)
+
+	for a := range addrs {
+		for ip := range server.nsIps {
+			if ip == a {
+				return nil
+			}
+		}
+	}
+
+	return errors.New("Not a nameserver")
 }
 
 // Size returns size of file in request, or error
@@ -150,12 +163,13 @@ func (server *FileServer) Create(
 	ctx context.Context,
 	request *api.CreateRequest,
 ) (*api.CreateResponse, error) {
-	if !server.isNS(ctx) {
-		return nil, errors.Wrap(ErrNotNS, "Failed to create")
+	err := server.assertNS(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create")
 	}
 	filePath := path.Join(server.storagePath, request.Inode)
 
-	_, err := os.Stat(filePath)
+	_, err = os.Stat(filePath)
 	// Check that fragment is not exists
 	if os.IsNotExist(err) {
 		var file *os.File
@@ -175,11 +189,12 @@ func (server *FileServer) Remove(
 	ctx context.Context,
 	request *api.RemoveRequest,
 ) (*api.RemoveResponse, error) {
-	if !server.isNS(ctx) {
-		return nil, errors.Wrap(ErrNotNS, "Failed to remove")
+	err := server.assertNS(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to remove")
 	}
 	filePath := path.Join(server.storagePath, request.Inode)
-	err := os.Remove(filePath)
+	err = os.Remove(filePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "Can not remove fragment")
 	}
