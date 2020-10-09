@@ -1,7 +1,8 @@
 MOUNTDIR=mnt
 NFILESERVERS=3
+DCC=docker-compose -f docker/docker-compose.yml
 
-all: generate fileserver nameserver build/client
+all: generate fileserver nameserver client
 
 generate: pkg/api/nameserver/nameserver.pb.go pkg/api/fileserver/fileserver.pb.go
 
@@ -23,16 +24,16 @@ nameserver: build/nameserver
 
 build/client: cmd/fuse/* pkg/fuse/*
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o build/client ./cmd/fuse
+client: build/client
+	docker build -f docker/client/Dockerfile -t mexator/client .
 
-local_run: generate fileserver nameserver build/client
-	docker-compose -f docker/docker-compose.yml down || true
-	docker-compose -f docker/docker-compose.yml up -d --scale fileserver=$(NFILESERVERS)
-	while ! docker-compose -f docker/docker-compose.yml logs | grep -q '"grpc.method": "ConnectFileServer"' ; do :; done
-	[ $$(docker-compose -f docker/docker-compose.yml logs | grep '"grpc.method": "ConnectFileServer"' | grep OK | wc -l) = $(NFILESERVERS) ]
-	mkdir -p $(MOUNTDIR)
-	./build/client -fuse.debug :3000 mnt
+local_run: all
+	$(DCC) down || true
+	$(DCC) up -d --scale fileserver=$(NFILESERVERS)
+	while [ $$($(DCC) logs | grep '"grpc.method": "ConnectFileServer"' | grep OK | wc -l) = $(NFILESERVERS) ]; do :; done
+	$(DCC) exec client sh
 
 local_logs:
-	sudo docker-compose -f docker/docker-compose.yml logs
+	$(DCC) logs
 
 .PHONY: generate fileserver nameserver all local_run

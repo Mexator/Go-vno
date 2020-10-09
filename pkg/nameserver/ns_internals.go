@@ -191,7 +191,7 @@ func (f *file) replicate(addr string, g *GRPCServer) {
 
 func (d *directory) replicate(addr string, g *GRPCServer) {
 	d.entries.Range(func(_, eint interface{}) bool {
-		eint.(dirEntry).consensus(addr, g)
+		eint.(dirEntry).replicate(addr, g)
 		return true
 	})
 }

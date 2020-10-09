@@ -1,10 +1,15 @@
 version: "3.8"
 
 services:
+    client:
+        image: mexator/client
+        devices:
+          - '/dev/fuse'
+        cap_add:
+          - SYS_ADMIN
+
     nameserver:
         image: mexator/nameserver
-        ports: 
-            - "3000:3000"
 
     fileserver:
         image: mexator/fileserver
