@@ -128,7 +128,7 @@ func (server *FileServer) Read(
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return &api.ReadResponse{Content: nil}, errors.New("Fragment not exist")
+		return nil, errors.New("Fragment not exist")
 	}
 
 	defer file.Close()
@@ -136,11 +136,10 @@ func (server *FileServer) Read(
 	buffer := make([]byte, request.Size)
 
 	len, err := file.ReadAt(buffer, int64(request.Offset))
-	if len >= 0 && (err == nil || err == io.EOF) {
+	if err == nil || err == io.EOF {
 		return &api.ReadResponse{Content: buffer[:len]}, nil
 	}
-	return &api.ReadResponse{Content: nil}, errors.New("Error reading fragment")
-
+	return nil, errors.Wrap(err, "Error reading fragment")
 }
 
 func (server *FileServer) Write(
