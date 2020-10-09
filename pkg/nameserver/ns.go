@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -248,14 +247,9 @@ func (g *GRPCServer) ConnectFileServer(
 		return nil, ErrNoPeerInfo
 	}
 
-	fields := strings.Split(peer.Addr.String(), ":")
-	fields = fields[:len(fields)-1]
-
-	var addr string
-	for _, part := range fields {
-		addr += part + ":"
-	}
-	addr += strconv.Itoa(int(req.Port))
+	fullAddr := peer.Addr.String()
+	addr := fullAddr[:strings.LastIndex(fullAddr, ":")]
+	addr = fmt.Sprintf("%s:%d", addr, req.Port)
 
 	_, ok = g.servers[addr]
 	if ok {
