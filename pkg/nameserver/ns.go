@@ -250,6 +250,7 @@ func (g *GRPCServer) ConnectFileServer(
 	fullAddr := peer.Addr.String()
 	addr := fullAddr[:strings.LastIndex(fullAddr, ":")]
 	addr = fmt.Sprintf("%s:%d", addr, req.Port)
+	log.Printf("Connect request from %s", addr)
 
 	_, ok = g.servers[addr]
 	if ok {
