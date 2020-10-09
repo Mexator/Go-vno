@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -45,11 +44,12 @@ func main() {
 	}
 
 	go func(nsurl string) {
-		for err := errors.New(""); err != nil; {
-			err = attachToNS(nsurl)
-			time.Sleep(time.Second)
+		for {
+			attachToNS(nsurl)
+			<-time.After(time.Second)
 		}
 	}(nsurl)
+
 	if err := s.Serve(listener); err != nil {
 		log.Fatal(err)
 	}

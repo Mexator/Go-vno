@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ type (
 	dirEntry interface {
 		AsNode() *nsapi.Node
 		Remove(context.Context) error
+		replicate(addr string, g *GRPCServer)
 	}
 
 	directory struct {
@@ -28,7 +30,7 @@ type (
 		name string
 
 		inode       string
-		fileservers []string
+		fileservers sync.Map // map[string]struct{}
 	}
 
 	root struct{ dir directory }
@@ -51,8 +53,8 @@ func (d *directory) Remove(ctx context.Context) error {
 
 func (f *file) Remove(ctx context.Context) error {
 	var err error
-	for _, fsurl := range f.fileservers {
-		conn, e := cache.GrpcDial(fsurl, grpcopts...)
+	f.fileservers.Range(func(fsurl, value interface{}) bool {
+		conn, e := cache.GrpcDial(fsurl.(string), grpcopts...)
 		if err != nil {
 			err = e
 		}
@@ -62,7 +64,8 @@ func (f *file) Remove(ctx context.Context) error {
 		if err != nil {
 			err = e
 		}
-	}
+		return true
+	})
 	return err
 }
 
@@ -108,4 +111,87 @@ func (r *root) lookup_dir(path string) (*directory, error) {
 		return nil, ErrDirIsFile
 	}
 	return dir, nil
+}
+
+func (f *file) replicate(addr string, g *GRPCServer) {
+	var err error = errors.New("")
+	var s []string
+
+	for err != nil {
+		s, err = g.pickServers(1)
+		if err == nil {
+			_, ok := f.fileservers.Load(s[0])
+			if ok {
+				err = errors.New("")
+			}
+		}
+	}
+
+	var old, new fsapi.FileServerClient
+
+	f.fileservers.Delete(addr)
+
+	f.fileservers.Range(func(k, _ interface{}) bool {
+		conn, err := cache.GrpcDial(k.(string), grpcopts...)
+		if err != nil {
+			return false
+		}
+		old = fsapi.NewFileServerClient(conn)
+		return false
+	})
+	if old == nil {
+		// Hope for the best
+		return
+	}
+	conn, err := cache.GrpcDial(s[0], grpcopts...)
+	if err != nil {
+		// Hope for the best
+		return
+	}
+	new = fsapi.NewFileServerClient(conn)
+
+	ctx := context.Background()
+	szr, err := old.Size(ctx, &fsapi.SizeRequest{Inode: f.inode})
+	if err != nil {
+		return
+	}
+	sz := szr.Size
+
+	var readsize uint64 = 2 * 1024 * 1024
+	var i uint64
+
+	for i = 0; i < sz; i += readsize {
+		if i+readsize >= sz {
+			readsize = sz - i - 1
+		}
+
+		rreq := &fsapi.ReadRequest{
+			Inode:  f.inode,
+			Offset: i,
+			Size:   readsize,
+		}
+		rresp, err := old.Read(ctx, rreq)
+		if err != nil {
+			return
+		}
+
+		wreq := &fsapi.WriteRequest{
+			Inode:   f.inode,
+			Offset:  i,
+			Content: rresp.Content,
+		}
+		_, err = new.Write(ctx, wreq)
+		if err != nil {
+			return
+		}
+	}
+
+	f.fileservers.Store(s[0], struct{}{})
+}
+
+func (d *directory) replicate(addr string, g *GRPCServer) {
+	d.entries.Range(func(_, eint interface{}) bool {
+		eint.(dirEntry).consensus(addr, g)
+		return true
+	})
 }

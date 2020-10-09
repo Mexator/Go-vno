@@ -22,7 +22,7 @@ import (
 
 type (
 	GRPCServer struct {
-		servers      map[string]struct{}
+		servers      sync.Map // map[string]chan struct{}
 		replicatecnt uint
 		root         root
 	}
@@ -53,13 +53,21 @@ func getInode() string {
 
 // NewServer creates new NameServer
 func NewServer() nsapi.NameServerServer {
-	serversset := make(map[string]struct{})
-	return &GRPCServer{servers: serversset, replicatecnt: 2}
+	return &GRPCServer{replicatecnt: 2}
+}
+
+func (g *GRPCServer) nservers() int {
+	len := 0
+	g.servers.Range(func(key, value interface{}) bool {
+		len++
+		return true
+	})
+	return len
 }
 
 func (g *GRPCServer) pickServers(n int) ([]string, error) {
-	if len(g.servers) < n {
-		return nil, errors.Wrapf(ErrNoFileSevers, "servers %v", g.servers)
+	if g.nservers() < n {
+		return nil, ErrNoFileSevers
 	}
 
 	seed := sync.Once{}
@@ -67,10 +75,11 @@ func (g *GRPCServer) pickServers(n int) ([]string, error) {
 		rand.Seed(time.Now().Unix())
 	})
 
-	keys := make([]string, 0, len(g.servers))
-	for k := range g.servers {
-		keys = append(keys, k)
-	}
+	keys := make([]string, 0, g.nservers())
+	g.servers.Range(func(k, _ interface{}) bool {
+		keys = append(keys, k.(string))
+		return true
+	})
 
 	rand.Shuffle(n, func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
 	return keys[:n], nil
@@ -108,6 +117,7 @@ func (g *GRPCServer) Create(
 	}
 
 	_, ok := dir.entries.Load(node)
+
 	if ok {
 		return nil, errors.Wrap(ErrFileExists, "Create")
 	}
@@ -117,41 +127,43 @@ func (g *GRPCServer) Create(
 		return &nsapi.CreateResponse{}, nil
 	}
 
-	fileservers, err := g.pickServers(int(g.replicatecnt))
+	fsarr, err := g.pickServers(int(g.replicatecnt))
 	if err != nil {
 		return nil, err
 	}
 	inode := getInode()
 
 	// Falsestarting servers in order to get some errors beforehand
-	for _, fs := range fileservers {
+	for _, fs := range fsarr {
 		_, err := cache.GrpcDial(fs, grpcopts...)
 		if err != nil {
 			return nil, errors.Wrap(err, "Create: Failed to dial with fileserver")
 		}
 	}
 
-	var i int
+	fl := &file{inode: inode}
 
-	for i = 0; i < len(fileservers); i++ {
-		conn, _ := cache.GrpcDial(fileservers[i], grpcopts...)
+	for _, url := range fsarr {
+		conn, _ := cache.GrpcDial(url, grpcopts...)
 		f := fsapi.NewFileServerClient(conn)
 		_, err := f.Create(ctx, &fsapi.CreateRequest{Inode: inode})
 		if err != nil {
 			log.Print(err)
 			goto cleanup
 		}
+		fl.fileservers.Store(url, struct{}{})
 	}
 
-	dir.entries.Store(node, &file{inode: inode, fileservers: fileservers})
+	dir.entries.Store(node, fl)
 	return &nsapi.CreateResponse{}, nil
 
 cleanup:
-	for ; i >= 0; i-- {
-		conn, _ := cache.GrpcDial(fileservers[i], grpcopts...)
+	fl.fileservers.Range(func(fsurl, _ interface{}) bool {
+		conn, _ := cache.GrpcDial(fsurl.(string), grpcopts...)
 		f := fsapi.NewFileServerClient(conn)
 		f.Remove(ctx, &fsapi.RemoveRequest{Inode: inode})
-	}
+		return true
+	})
 	return nil, err
 }
 
@@ -230,7 +242,27 @@ func (g *GRPCServer) MapFS(
 		return nil, errors.Wrapf(ErrFileIsDir, "MapFS: dir: `%s' name: `%s'", d, fname)
 	}
 
-	return &nsapi.MapFSResponse{Fsurls: file.fileservers, Inode: file.inode}, nil
+	var Fsurls []string
+	file.fileservers.Range(func(k, _ interface{}) bool {
+		Fsurls = append(Fsurls, k.(string))
+		return true
+	})
+
+	return &nsapi.MapFSResponse{Fsurls: Fsurls, Inode: file.inode}, nil
+}
+
+func (g *GRPCServer) healthcheck(addr string, ch chan struct{}) {
+	for {
+		select {
+		case <-ch:
+			continue
+		case <-time.After(10 * time.Second):
+			log.Println("Disconnected", addr)
+			g.servers.Delete(addr)
+			g.root.dir.replicate(addr, g)
+			return
+		}
+	}
 }
 
 // ConnectFileServer is a request that fileservers use to connect to
@@ -253,8 +285,10 @@ func (g *GRPCServer) ConnectFileServer(
 	}
 
 	addr := fmt.Sprintf("%s:%d", host, req.Port)
-	_, ok = g.servers[host]
+	c, ok := g.servers.Load(addr)
 	if ok {
+		log.Println("Disconnect timed out", addr)
+		c.(chan struct{}) <- struct{}{}
 		return &nsapi.ConnectResponse{}, nil
 	}
 
@@ -270,6 +304,8 @@ func (g *GRPCServer) ConnectFileServer(
 		return nil, err
 	}
 
-	g.servers[addr] = struct{}{}
+	ch := make(chan struct{})
+	g.servers.Store(addr, ch)
+	go g.healthcheck(addr, ch)
 	return &nsapi.ConnectResponse{}, nil
 }
