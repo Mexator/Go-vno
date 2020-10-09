@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	api "github.com/Mexator/Go-vno/pkg/api/fileserver"
 	nsapi "github.com/Mexator/Go-vno/pkg/api/nameserver"
@@ -35,25 +37,32 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	api.RegisterFileServerServer(s, &srv)
+	api.RegisterFileServerServer(s, srv)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", *host, *port))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	go attachToNS(nsurl)
+	go func(nsurl string) {
+		for err := errors.New(""); err != nil; {
+			err = attachToNS(nsurl)
+			time.Sleep(time.Second)
+		}
+	}(nsurl)
 	if err := s.Serve(listener); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func attachToNS(serverAddress string) {
+func attachToNS(serverAddress string) error {
 	var grpcopts = []grpc.DialOption{grpc.WithInsecure()}
 	conn, err := grpc.Dial(serverAddress, grpcopts...)
 	if err != nil {
-		log.Fatal("Can not connect to name server")
+		return err
 	}
 	client := nsapi.NewNameServerClient(conn)
-	client.ConnectFileServer(context.Background(), &nsapi.ConnectRequest{Port: int32(*port)})
+	req := &nsapi.ConnectRequest{Port: int32(*port)}
+	_, err = client.ConnectFileServer(context.Background(), req)
+	return err
 }
