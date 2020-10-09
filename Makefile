@@ -26,7 +26,7 @@ local_run: generate fileserver nameserver build/client
 	docker-compose -f docker/docker-compose.yml up -d --scale fileserver=3
 	if [ ! -d $(MOUNTDIR) ]; then \
 		mkdir $(MOUNTDIR);\
-    fi
+	fi
 	./build/client -fuse.debug :3000 mnt
 
 .PHONY: generate fileserver nameserver fuse all local_run
