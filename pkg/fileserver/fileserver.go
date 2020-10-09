@@ -123,7 +123,7 @@ func (server *FileServer) Read(
 	buffer := make([]byte, request.Size)
 
 	len, err := file.ReadAt(buffer, int64(request.Offset))
-	if len > 0 && (err == nil || err == io.EOF) {
+	if len >= 0 && (err == nil || err == io.EOF) {
 		return &api.ReadResponse{Content: buffer[:len]}, nil
 	}
 	return &api.ReadResponse{Content: nil}, errors.New("Error reading fragment")
