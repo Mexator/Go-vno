@@ -51,6 +51,13 @@ files, open some
 special terminal sessions or using a GUI. Everything that needs to be done at 
 client's side is to launch our daemon server.
 
+---
+However, the requirements says that we should Dockerize our client. This 
+disables almost all advantages we got from using `fuse` and gives us 
+additional complexity, for example when launching the client container (it should have certain privileges to be launched correctly)
+
+---
+
 ### **NameServer**
 Mostly, the clients talk to the Name server which is used for indexing and 
 replicating files. It stores whole directory tree and mapping of file 
@@ -133,6 +140,22 @@ you will end up in container where you should run
 	
 after that you may go to `/mnt/` directory and use filesystem as every other
 filesystem you used to know.
+
+## Deployed system
+We have deployed our system to AWS, with 1 name server and 3 file servers, 
+each one on different instance, inside Docker container. You can test the 
+filesystem by calling the following commands (**NOTE**: you should have 
+`fuse` kernel module installed on your machine):
+```shell
+$ docker run -d --device /dev/fuse --cap-add=SYS_ADMIN --security-opt=apparmor:unconfined mexator/client
+$ dc exec -it CONTAINER_NAME sh
+```
+This will get you to the client container, where you should run 
+```shell
+$ nohup ./client  ec2-18-191-130-90.us-east-2.compute.amazonaws.com:3000 /mnt &
+```
+After this, the DFS will be mounted to `/mnt` folder, inside the container. 
+You can use it just like any other Unix directory.
 
 ## Provable contribution of all team members
 There are two of us, and as you can see, we had a lot of pull request, several

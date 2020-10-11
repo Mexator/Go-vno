@@ -1,4 +1,4 @@
 # Build context should be project root
-FROM scratch
+FROM alpine
 COPY build/fileserver /
 ENTRYPOINT ["/fileserver"]

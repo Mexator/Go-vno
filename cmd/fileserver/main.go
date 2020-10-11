@@ -10,6 +10,7 @@ import (
 
 	api "github.com/Mexator/Go-vno/pkg/api/fileserver"
 	nsapi "github.com/Mexator/Go-vno/pkg/api/nameserver"
+	"github.com/Mexator/Go-vno/pkg/cache"
 	"github.com/Mexator/Go-vno/pkg/fileserver"
 	"github.com/Mexator/Go-vno/pkg/utils"
 
@@ -57,7 +58,7 @@ func main() {
 
 func attachToNS(serverAddress string) error {
 	var grpcopts = []grpc.DialOption{grpc.WithInsecure()}
-	conn, err := grpc.Dial(serverAddress, grpcopts...)
+	conn, err := cache.GrpcDial(serverAddress, grpcopts...)
 	if err != nil {
 		return err
 	}
